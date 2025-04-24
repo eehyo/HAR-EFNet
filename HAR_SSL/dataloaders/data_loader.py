@@ -133,27 +133,37 @@ class PAMAP2(object):
         df_dict = {}
         for file in file_list:
             if file == 'subject109.dat': continue
-            
+
+            # (408031, 54)
             sub_data = pd.read_table(os.path.join(data_path,file), header=None, sep=r'\s+')
+            # (408031, 19)
             sub_data = sub_data.iloc[:,self.used_cols]
             sub_data.columns = self.col_names
+
+            # print(f"Successfully loaded {file}")
+            # print(f"Shape of loaded data: {sub_data.shape}")
+            # print(f"Columns: {sub_data.columns.tolist()}")
+            # print(f"Data types: {sub_data.dtypes}")
 
             # if missing values, imputation
             sub_data = sub_data.interpolate(method='linear', limit_direction='both')
             sub = int(self.file_encoding[file])
             sub_data['sub_id'] = sub
             sub_data["sub"] = sub
+            # (408031, 21)
 
             if sub not in self.sub_ids_of_each_sub.keys():
                 self.sub_ids_of_each_sub[sub] = []
             self.sub_ids_of_each_sub[sub].append(sub)
             df_dict[self.file_encoding[file]] = sub_data   
 
+        # (2864056, 21)
         df_all = pd.concat(df_dict)
 
         # Downsampling - Not used
         df_all.reset_index(drop=True,inplace=True)
         index_list = list(np.arange(0,df_all.shape[0],3))
+        # (954686, 21)
         df_all = df_all.iloc[index_list]
 
         df_all = df_all.set_index('sub_id')
@@ -386,12 +396,18 @@ class Dataset(object):
             self.window_index = dataset.test_window_index
 
         classes = dataset.no_drop_activites
+        # {1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7, 9: 8, 10: 9, 11: 10, 12: 11}
         self.class_transform = {x: i for i, x in enumerate(classes)}
 
+        # (954686, 11)
         self.data_x = dataset.normalized_data_x
+        # (954686,)
         self.data_y = dataset.data_y
 
+        # [sub_id, start, end]
+        # end - start = 168
         self.input_length = self.slidingwindows[0][2]-self.slidingwindows[0][1]
+        # 9
         self.channel_in = self.data_x.shape[1]-2
 
     def __getitem__(self, index):
@@ -400,6 +416,8 @@ class Dataset(object):
         end_index = self.slidingwindows[index][2]
 
         sample_x = self.data_x.iloc[start_index:end_index, 1:-1].values
+        # 이건 왜 있는 과정?
+        # 차원이 늘어나는 이유
         sample_x = np.expand_dims(sample_x,0)
 
         sample_y = self.class_transform[self.data_y.iloc[start_index:end_index].mode().loc[0]]

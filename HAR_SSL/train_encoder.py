@@ -65,7 +65,8 @@ class EncoderTrainer:
         self.model.train()
         train_loss = []
         epoch_time = time.time()
-        
+        # batch_x.shape: (128, 1, 168, 9)
+        # batch_x.shape: (64, 1, 168, 9)
         for batch_x, _ in train_loader:  # label is not needed for ECDF features
             # Process input data
             batch_x = batch_x.float().to(self.device)

@@ -9,45 +9,57 @@ def compute_ecdf_features(window_data, n_points=25):
     Feature extraction based on ECDF (Empirical Cumulative Distribution Function)
     
     Args:
-        window_data: Input time series data [window_size, channels]
+        window_data: Input time series data [window_size, channels] or [1, window_size, channels]
         n_points: Number of points to extract from each time series (default: 25)
     
     Returns:
-        ECDF feature vector [234] (26 dimensions × 9 channels)
+        ECDF feature vector [(n_points + 1) * 9] ((25+1)*9 = 234 dimensions)
     """
     if isinstance(window_data, torch.Tensor):
         window_data = window_data.numpy()
-    
     # Channel order: [x_hand, y_hand, z_hand, x_chest, y_chest, z_chest, x_ankle, y_ankle, z_ankle]
     # Or in the form of [acc_x_hand, acc_y_hand, acc_z_hand, ...]
-    channels = window_data.shape[1]
+    # print(window_data)
+    # print(window_data.shape)
+    # window_data.shape: (1, 169, 9)
+    # channels = window_data.shape[1]
+    # Handle 3D input (batch_size=1, window_size, channels)
+    if len(window_data.shape) == 3:
+        window_data = window_data.squeeze(0)  # Remove batch dimension
     
+    channels = window_data.shape[1]
     if channels != 9 and channels != 18:
         raise ValueError(f"Unsupported number of channels: {channels}. Must be 9 (acc only) or 18 (acc+gyro).")
+    
     # Use only acc sensors (9 channels)
     if channels == 18:  # If both acc and gyro data exist
         acc_indices = list(range(0, 18, 2))  # Select acc indices only
         window_data = window_data[:, acc_indices]
     
-    ecdf_features = []
+    # Initialize output array: (n_points + 1) features per channel * 9 channels
+    ecdf_features = np.zeros((n_points + 1) * 9)
     
-    # Calculate ECDF features for each axis
-    for axis in range(9):  # 9 axes (3 axes × 3 locations)
-        axis_data = window_data[:, axis]
+    # Process each channel separately
+    for i in range(9):
+        # Extract data for current channel
+        channel_data = window_data[:, i]
         
-        mean_value = np.mean(axis_data)
+        # Calculate mean
+        mean_value = np.mean(channel_data)
         
-        sorted_data = np.sort(axis_data)
+        # Sort data for ECDF
+        sorted_data = np.sort(channel_data)
         
         # Select n_points points at equal intervals
         indices = np.around(np.linspace(0, len(sorted_data) - 1, num=n_points)).astype(int)
         ecdf_points = sorted_data[indices]
         
-        ecdf_features.extend(ecdf_points)
-        
-        ecdf_features.append(mean_value)
+        # Store features for this channel: n_points ECDF points + 1 mean value
+        start_idx = i * (n_points + 1)
+        ecdf_features[start_idx:start_idx + n_points] = ecdf_points
+        ecdf_features[start_idx + n_points] = mean_value
     
-    return np.array(ecdf_features)
+    return ecdf_features.astype(np.float32)
 
 def compute_batch_ecdf_features(batch_data):
     """
@@ -57,10 +69,10 @@ def compute_batch_ecdf_features(batch_data):
         batch_data: Batch time series data [batch_size, window_size, channels]
     
     Returns:
-        Batch ECDF features [batch_size, 234]
+        Batch ECDF features [batch_size, (n_points+1)*9]
     """
     batch_size = batch_data.shape[0]
-    features = np.zeros((batch_size, 234))
+    features = np.zeros((batch_size, 234))  # (n_points+1)*9 = (25+1)*9 = 234
     
     for i in range(batch_size):
         features[i] = compute_ecdf_features(batch_data[i])

@@ -87,7 +87,7 @@ class CNNEncoder(EncoderBase):
         forward pass
         
         Args:
-            x: input data [batch_size, window_size, input_channels]
+            x: input data [batch_size, 1, window_size, input_channels]
             
         Returns:
             encoder output [batch_size, output_size]
@@ -96,7 +96,18 @@ class CNNEncoder(EncoderBase):
         print(f"Input shape: {x.shape}")
 
         # Rearrange input to match Conv1d requirement: [B, C, T]
+        # x.shape: (128, 1, 168, 9)
+        ########## debug ##########
+        # dim mismatch
         x = x.permute(0, 2, 1)
+
+        # # 4차원 입력 [B, 1, T, C] -> [B, C, T] 변환
+        # if len(x.shape) == 4:
+        #     # [batch_size, 1, window_size, channels] -> [batch_size, channels, window_size]
+        #     x = x.squeeze(1).permute(0, 2, 1)
+        # else:
+        #     # 3차원 입력 [B, T, C] -> [B, C, T]
+        #     x = x.permute(0, 2, 1)
         
         print(f"Transformed input shape: {x.shape}")
         for conv_block in self.conv_blocks:
