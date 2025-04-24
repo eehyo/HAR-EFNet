@@ -1,0 +1,18 @@
+ssl_encoder:
+  encoder_type: cnn
+  
+  cnn:
+    kernel_size: 5
+    conv_channels: [64, 128, 256]
+    dropout_rate: 0.3
+  
+  lstm:
+    hidden_size: 128
+    num_layers: 2
+    bidirectional: True
+    dropout_rate: 0.3
+
+classifier:
+  freeze_encoder: True  # 인코더 파라미터 고정 여부
+  classifier_hidden: [256, 128]  # 분류 헤드의 은닉층 차원
+  dropout_rate: 0.5 
