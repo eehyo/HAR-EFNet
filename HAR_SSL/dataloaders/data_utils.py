@@ -19,13 +19,12 @@ def compute_ecdf_features(window_data, n_points=25):
         window_data = window_data.numpy()
     # Channel order: [x_hand, y_hand, z_hand, x_chest, y_chest, z_chest, x_ankle, y_ankle, z_ankle]
     # Or in the form of [acc_x_hand, acc_y_hand, acc_z_hand, ...]
-    # print(window_data)
-    # print(window_data.shape)
-    # window_data.shape: (1, 169, 9)
-    # channels = window_data.shape[1]
+
+    # window_data.shape: (169, 9)
+
     # Handle 3D input (batch_size=1, window_size, channels)
-    if len(window_data.shape) == 3:
-        window_data = window_data.squeeze(0)  # Remove batch dimension
+    # if len(window_data.shape) == 3:
+    #     window_data = window_data.squeeze(0)  # Remove batch dimension
     
     channels = window_data.shape[1]
     if channels != 9 and channels != 18:
@@ -43,7 +42,6 @@ def compute_ecdf_features(window_data, n_points=25):
     for i in range(9):
         # Extract data for current channel
         channel_data = window_data[:, i]
-        
         # Calculate mean
         mean_value = np.mean(channel_data)
         

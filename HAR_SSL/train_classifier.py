@@ -5,12 +5,16 @@ import numpy as np
 import yaml
 from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset
-from sklearn.metrics import f1_score, accuracy_score
+from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
 
 from classifiers.classifier_base import ClassifierModel
 from train_encoder import create_encoder, load_pretrained_encoder
 from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
 from utils.logger import Logger
+
+# Make sure logger is initialized
+if Logger._run_id is None:
+    Logger.initialize(log_dir='logs')
 
 class ClassifierTrainer:
     """
@@ -52,8 +56,10 @@ class ClassifierTrainer:
         self.epochs = args.train_epochs
         
         # Early stopping and learning rate adjustment
-        self.early_stopping = EarlyStopping(patience=args.early_stop_patience, verbose=True)
-        self.learning_rate_adapter = adjust_learning_rate(args, verbose=True)
+        self.early_stopping = EarlyStopping(patience=args.early_stop_patience, verbose=True,
+                                          logger_name=f"es_classifier_{args.encoder_type}")
+        self.learning_rate_adapter = adjust_learning_rate(args, verbose=True,
+                                                      logger_name=f"lr_classifier_{args.encoder_type}")
     
     def train_epoch(self, train_loader):
         """
@@ -196,6 +202,9 @@ def create_classifier(args, encoder):
     Returns:
         Created classifier model
     """
+    # Initialize logger
+    logger = Logger("classifier_creator")
+    
     # Load model configuration
     config_file = open('configs/model.yaml', mode='r')
     model_config = yaml.load(config_file, Loader=yaml.FullLoader)
@@ -208,6 +217,7 @@ def create_classifier(args, encoder):
         config=classifier_config
     )
     
+    logger.info(f"Created classifier with {args.num_classes} classes")
     return model
 
 def evaluate_classifier(args, model, test_loader, save_path=None):
@@ -254,8 +264,12 @@ def evaluate_classifier(args, model, test_loader, save_path=None):
     f_macro = f1_score(true_labels, predictions, average='macro')
     f_micro = f1_score(true_labels, predictions, average='micro')
     
+    # Get test subject ID and fold index from args
+    test_subject = getattr(args, 'test_subject', getattr(args, 'index_of_cv', 'Unknown'))
+    fold_idx = getattr(args, 'fold_idx', 'Unknown')
+    
     # Log results
-    logger.info(f"Test results:")
+    logger.info(f"Test results for Subject {test_subject} (Fold {fold_idx}):")
     logger.info(f"Accuracy: {acc:.7f}")
     logger.info(f"F1 Weighted: {f_w:.7f}")
     logger.info(f"F1 Macro: {f_macro:.7f}")
@@ -266,13 +280,24 @@ def evaluate_classifier(args, model, test_loader, save_path=None):
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         
+        # Save basic results
         result_file = os.path.join(save_path, "test_results.txt")
         with open(result_file, "a") as f:
-            f.write(f"Test results (Subject {args.index_of_cv}):\n")
+            f.write(f"Test results for Subject {test_subject} (Fold {fold_idx}):\n")
             f.write(f"Accuracy: {acc:.7f}\n")
             f.write(f"F1 Weighted: {f_w:.7f}\n")
             f.write(f"F1 Macro: {f_macro:.7f}\n")
             f.write(f"F1 Micro: {f_micro:.7f}\n")
             f.write("-" * 50 + "\n")
+            
+        # # Save confusion matrix
+        # if len(np.unique(true_labels)) > 1:  # Only if we have multiple classes
+        #     cm = confusion_matrix(true_labels, predictions)
+            
+        #     # Save confusion matrix to file
+        #     cm_file = os.path.join(save_path, "confusion_matrix.txt")
+        #     with open(cm_file, "a") as f:
+        #         f.write(f"Confusion Matrix for Subject {test_subject} (Fold {fold_idx}):\n")
+        #         f.write(str(cm) + "\n\n")
     
     return acc, f_w, f_macro, f_micro 

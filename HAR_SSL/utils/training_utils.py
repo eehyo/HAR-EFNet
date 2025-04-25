@@ -7,6 +7,10 @@ from scipy.fftpack import fft, fftfreq, ifft
 
 from .logger import Logger
 
+# Make sure logger is initialized
+if not hasattr(Logger, '_run_id') or Logger._run_id is None:
+    Logger.initialize(log_dir='logs')
+
 def set_seed(seed):
     """
     Set random seed for reproducibility
@@ -32,8 +36,6 @@ class EarlyStopping:
                             Default: False
             delta (float): Minimum change in the monitored quantity to qualify as an improvement.
                             Default: 0
-            path (str): Path for the checkpoint to be saved to.
-                            Default: 'checkpoint.pt'
   
         """
         self.patience = patience
@@ -93,12 +95,14 @@ class EarlyStopping:
             os.makedirs(save_path)
         
         # save model state
-        model_path = os.path.join(save_path, 'best_model.pth')
+        run_id = Logger.get_run_id()
+        model_path = os.path.join(save_path, f'best_model_{run_id}.pth')
         
         # save model state and metadata
         checkpoint = {
             'model_state_dict': model.state_dict(),
-            'val_loss': val_loss
+            'val_loss': val_loss,
+            'run_id': run_id
         }
         
         if metric is not None:
@@ -181,3 +185,59 @@ class adjust_learning_rate:
 #     x_reshaped = x_reordered.reshape(batch, time_length, 3, 3)
 
 #     return x_reshaped
+
+def save_results_summary(results, args, timestamp):
+    """Save a summary of experiment results"""
+    # Create results directory
+    results_path = os.path.join(args.results_save_path, f"{args.encoder_type}_{timestamp}")
+    os.makedirs(results_path, exist_ok=True)
+    
+    # Calculate overall statistics
+    mean_acc = np.mean(results['accuracy'])
+    std_acc = np.std(results['accuracy'])
+    mean_f_w = np.mean(results['f1_weighted'])
+    std_f_w = np.std(results['f1_weighted'])
+    mean_f_macro = np.mean(results['f1_macro'])
+    std_f_macro = np.std(results['f1_macro'])
+    mean_f_micro = np.mean(results['f1_micro'])
+    std_f_micro = np.std(results['f1_micro'])
+    
+    # List of subjects that were tested
+    tested_subjects = ", ".join([str(s) for s in results['subject_id']])
+    
+    # Create logger for results
+    logger = Logger(f"results_{args.encoder_type}")
+    
+    # Log overall performance
+    logger.info("\n===== LOOCV Performance Summary =====")
+    logger.info(f"Tested Subjects: {tested_subjects}")
+    logger.info(f"Accuracy: mean={mean_acc:.7f}, std={std_acc:.7f}")
+    logger.info(f"F1 Weighted: mean={mean_f_w:.7f}, std={std_f_w:.7f}")
+    logger.info(f"F1 Macro: mean={mean_f_macro:.7f}, std={std_f_macro:.7f}")
+    logger.info(f"F1 Micro: mean={mean_f_micro:.7f}, std={std_f_micro:.7f}")
+    
+    # Save results to file
+    with open(os.path.join(results_path, "loocv_results.txt"), "w") as f:
+        f.write(f"Model: {args.encoder_type}_{timestamp}\n\n")
+        f.write(f"Experiment Settings:\n")
+        f.write(f"- Encoder Type: {args.encoder_type}\n")
+        f.write(f"- Tested Subjects: {tested_subjects}\n")
+        f.write(f"- Freeze Encoder: {args.freeze_encoder}\n")
+        f.write(f"- Classifier Learning Rate: {args.classifier_lr}\n")
+        f.write(f"- Classifier Epochs: {args.classifier_epochs}\n\n")
+        
+        # Subject-specific results
+        for i, subj_id in enumerate(results['subject_id']):
+            f.write(f"Subject {subj_id} Results:\n")
+            f.write(f"Accuracy: {results['accuracy'][i]:.7f}\n")
+            f.write(f"F1 Weighted: {results['f1_weighted'][i]:.7f}\n")
+            f.write(f"F1 Macro: {results['f1_macro'][i]:.7f}\n")
+            f.write(f"F1 Micro: {results['f1_micro'][i]:.7f}\n")
+            f.write("-" * 50 + "\n\n")
+        
+        # Overall summary
+        f.write("===== LOOCV Performance Summary =====\n")
+        f.write(f"Accuracy: mean={mean_acc:.7f}, std={std_acc:.7f}\n")
+        f.write(f"F1 Weighted: mean={mean_f_w:.7f}, std={std_f_w:.7f}\n")
+        f.write(f"F1 Macro: mean={mean_f_macro:.7f}, std={std_f_macro:.7f}\n")
+        f.write(f"F1 Micro: mean={mean_f_micro:.7f}, std={std_f_micro:.7f}\n")

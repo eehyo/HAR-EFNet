@@ -92,15 +92,19 @@ class CNNEncoder(EncoderBase):
         Returns:
             encoder output [batch_size, output_size]
         """
-        # 디버깅시 출력 형태 확인
-        print(f"Input shape: {x.shape}")
+        # 정적 카운터로 호출 횟수 추적
+        # 배치 횟수만큼 호출
+        if not hasattr(self.__class__, 'forward_call_count'):
+            self.__class__.forward_call_count = 0
+        self.__class__.forward_call_count += 1
+        
+        print(f"Forward call #{self.__class__.forward_call_count}, Input shape: {x.shape}")
 
         # Rearrange input to match Conv1d requirement: [B, C, T]
-        # x.shape: (128, 1, 168, 9)
-        ########## debug ##########
-        # dim mismatch
+        # (128, 168, 9) -> (128, 9, 168)
         x = x.permute(0, 2, 1)
 
+        # dim mismatch
         # # 4차원 입력 [B, 1, T, C] -> [B, C, T] 변환
         # if len(x.shape) == 4:
         #     # [batch_size, 1, window_size, channels] -> [batch_size, channels, window_size]

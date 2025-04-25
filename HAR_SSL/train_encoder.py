@@ -11,6 +11,9 @@ from dataloaders.data_utils import compute_ecdf_features, compute_batch_ecdf_fea
 from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
 from utils.logger import Logger
 
+# Initialize global logger
+Logger.initialize(log_dir='logs')
+
 class EncoderTrainer:
     """
     ECDF feature prediction encoder training class
@@ -30,6 +33,7 @@ class EncoderTrainer:
         
         # Initialize logger
         self.logger = Logger(f"encoder_{args.encoder_type}")
+        self.logger.info(f"Using device: {self.device}")
         
         # Use MSE Loss
         self.criterion = nn.MSELoss()
@@ -49,8 +53,10 @@ class EncoderTrainer:
         self.epochs = args.train_epochs
         
         # Early stopping and learning rate adjustment
-        self.early_stopping = EarlyStopping(patience=args.early_stop_patience, verbose=True)
-        self.learning_rate_adapter = adjust_learning_rate(args, verbose=True)
+        self.early_stopping = EarlyStopping(patience=args.early_stop_patience, verbose=True, 
+                                          logger_name=f"es_encoder_{args.encoder_type}")
+        self.learning_rate_adapter = adjust_learning_rate(args, verbose=True, 
+                                                      logger_name=f"lr_encoder_{args.encoder_type}")
     
     def train_epoch(self, train_loader):
         """
@@ -65,9 +71,13 @@ class EncoderTrainer:
         self.model.train()
         train_loss = []
         epoch_time = time.time()
+        batch_count = 0
         # batch_x.shape: (128, 1, 168, 9)
         # batch_x.shape: (64, 1, 168, 9)
         for batch_x, _ in train_loader:  # label is not needed for ECDF features
+            batch_count += 1
+            self.logger.debug(f"Processing batch #{batch_count} in train epoch")
+            
             # Process input data
             batch_x = batch_x.float().to(self.device)
             
@@ -89,6 +99,7 @@ class EncoderTrainer:
         
         epoch_time = time.time() - epoch_time
         train_loss = np.average(train_loss)
+        self.logger.info(f"Completed epoch with {batch_count} batches")
         
         return train_loss, epoch_time
     
@@ -104,9 +115,13 @@ class EncoderTrainer:
         """
         self.model.eval()
         valid_loss = []
+        batch_count = 0
         
         with torch.no_grad():
             for batch_x, _ in valid_loader:  
+                batch_count += 1
+                self.logger.debug(f"Processing batch #{batch_count} in validation")
+                
                 batch_x = batch_x.float().to(self.device)
                 
                 batch_ecdf = compute_batch_ecdf_features(batch_x.cpu().numpy())
@@ -119,6 +134,7 @@ class EncoderTrainer:
                 valid_loss.append(loss.item())
         
         valid_loss = np.average(valid_loss)
+        self.logger.info(f"Completed validation with {batch_count} batches")
         
         return valid_loss
     
@@ -133,10 +149,7 @@ class EncoderTrainer:
         Returns:
             Trained model
         """
-        self.logger.info(f"Starting encoder training, saving logs to: {self.save_path}")
-        
-        # Save the best performance
-        best_valid_loss = float('inf')
+        self.logger.info(f"Starting encoder training, saving to: {self.save_path}")
         
         for epoch in range(self.epochs):
             # Training phase
@@ -153,7 +166,7 @@ class EncoderTrainer:
             self.logger.info(log_message)
             
             # Early stopping check
-            self.early_stopping(valid_loss, self.model, self.save_path, log=None)
+            self.early_stopping(valid_loss, self.model, self.save_path, None)
             if self.early_stopping.early_stop:
                 self.logger.info("Early stopping triggered")
                 break
@@ -165,6 +178,40 @@ class EncoderTrainer:
         self.logger.info("Encoder training completed")
         return self.model
 
+    def save_checkpoint(self, val_loss, model, save_path, metric=None):
+        """
+        Save model checkpoint when validation loss decreases
+        
+        Args:
+            val_loss: Validation loss
+            model: Model to save
+            save_path: Path to save model
+            metric: Additional metric (optional)
+        """
+        if self.verbose:
+            self.logger.info(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}). Saving model...')
+        
+        # path check
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        
+        # 실행 ID를 포함한 파일 이름으로 저장
+        run_id = Logger.get_run_id()
+        model_path = os.path.join(save_path, f'best_model_{run_id}.pth')
+        
+        # save model state and metadata
+        checkpoint = {
+            'model_state_dict': model.state_dict(),
+            'val_loss': val_loss,
+            'run_id': run_id
+        }
+        
+        if metric is not None:
+            checkpoint['metric'] = metric
+            
+        torch.save(checkpoint, model_path)
+        self.val_loss_min = val_loss
+
 def create_encoder(args):
     """
     Create encoder model based on configuration
@@ -175,6 +222,9 @@ def create_encoder(args):
     Returns:
         Created encoder model
     """
+    # Initialize logger for encoder creation
+    logger = Logger("encoder_creator")
+    
     # Convert args to dict
     encoder_args = {
         'input_channels': args.input_channels,
@@ -192,10 +242,18 @@ def create_encoder(args):
     if args.encoder_type == 'cnn':
         encoder_args.update(encoder_config['cnn'])
         encoder = CNNEncoder(encoder_args)
+        # conv_channels = encoder_args.get('conv_channels', ['unknown'])
+        # dropout_rate = encoder_args.get('dropout_rate', 'unknown')
+        # logger.info(f"Created CNN encoder with channels {conv_channels} and dropout {dropout_rate}")
     elif args.encoder_type == 'lstm':
         encoder_args.update(encoder_config['lstm'])
         encoder = LSTMEncoder(encoder_args)
+    #     hidden_size = encoder_args.get('hidden_size', 'unknown')
+    #     num_layers = encoder_args.get('num_layers', 'unknown')
+    #     bidirectional = encoder_args.get('bidirectional', 'unknown')
+    #     logger.info(f"Created LSTM encoder with hidden size {hidden_size}, layers {num_layers}, bidirectional={bidirectional}")
     else:
+        logger.error(f"Unsupported encoder type: {args.encoder_type}")
         raise ValueError(f"Unsupported encoder type: {args.encoder_type}")
     
     return encoder
@@ -216,5 +274,7 @@ def load_pretrained_encoder(encoder, path):
     
     checkpoint = torch.load(path, map_location=encoder.device)
     encoder.load_state_dict(checkpoint['model_state_dict'])
+    logger.info(f"Successfully loaded model with validation loss: {checkpoint.get('val_loss', 'N/A')}")
+
     
     return encoder 

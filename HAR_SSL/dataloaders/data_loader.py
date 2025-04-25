@@ -11,8 +11,9 @@ def get_data(dataset, batch_size, flag="train"):
         shuffle_flag = True
     else:
         shuffle_flag = False
-  
+    # (1, 168, 9)
     dataset = Dataset(dataset, flag)
+    # (128, 1, 168, 9)
     data_loader = DataLoader(dataset,
                              batch_size = batch_size,
                              shuffle = shuffle_flag,
@@ -120,6 +121,9 @@ class PAMAP2(object):
         # noise, gravitational force filtering
         if self.args.filtering:
             self.data_x = self.Sensor_data_noise_grav_filtering(self.data_x.set_index('sub_id').copy())
+
+        ####################################################################    
+        # TODO: data_x, data_y pkl 저장
 
         # sliding window indexing
         self.train_slidingwindows = self.get_the_sliding_index(self.data_x.copy(), self.data_y.copy(), "train")
@@ -410,19 +414,24 @@ class Dataset(object):
         # 9
         self.channel_in = self.data_x.shape[1]-2
 
+    # DataLoader calls __getitem__ repeatedly to fetch (sample_x, sample_y) pairs.
     def __getitem__(self, index):
+        # [index, start_idx, end_idx]
         index = self.window_index[index]
         start_index = self.slidingwindows[index][1]
         end_index = self.slidingwindows[index][2]
-
+        # sample_x.shape: (168, 9)
         sample_x = self.data_x.iloc[start_index:end_index, 1:-1].values
-        # 이건 왜 있는 과정?
-        # 차원이 늘어나는 이유
-        sample_x = np.expand_dims(sample_x,0)
+        
 
+        # sample_x = np.expand_dims(sample_x,0)
+
+        # majority voting + index mapping
         sample_y = self.class_transform[self.data_y.iloc[start_index:end_index].mode().loc[0]]
 
         return sample_x, sample_y
 
     def __len__(self):
+        # Total number of samples (windows)
+        # Number of times __getitem__ will be called
         return len(self.window_index) 

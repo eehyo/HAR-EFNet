@@ -5,7 +5,7 @@ import torch
 
 from configs.config import get_args
 from dataloaders.data_loader import PAMAP2, get_data
-from utils.training_utils import set_seed
+from utils.training_utils import set_seed, save_results_summary
 from utils.logger import Logger
 
 from encoders import CNNEncoder, LSTMEncoder
@@ -33,31 +33,66 @@ if __name__ == '__main__':
     logger.info(f"Dataset: {args.data_name} loaded") 
 
     # for test performance aggregation (if args.test==True)
-    acc_list = []
-    f_w_list = []
-    f_macro_list = []
-    f_micro_list = []
+    results = {
+        'subject_id': [],
+        'accuracy': [],
+        'f1_weighted': [],
+        'f1_macro': [],
+        'f1_micro': []
+    }
 
-    # Cross-validation for each test subject
-    for test_sub in range(1, 9):
-        # Update test subject
+    # Configure which subjects to run for LOOCV
+    all_subjects = list(range(1, 9))  # Subject IDs 1-8
+    
+    # Filter to specific subject if requested
+    if args.specific_subject is not None:
+        fold_range = [args.specific_subject - 1]  # Convert Subject ID to fold index (0-based)
+        logger.info(f"Restricting training/evaluation: Testing only Subject {args.specific_subject}")
+    else:
+        fold_range = range(len(dataset.LOCV_keys))
+        logger.info(f"Running all {len(dataset.LOCV_keys)} subjects")
+
+    # Cross-validation for each test subject (LOOCV - Leave One Out Cross Validation)
+    logger.info(f"Starting {len(fold_range)}-fold Leave-One-Out Cross Validation")
+    
+    for fold_idx in fold_range:
+        # Set dataset state to the specified fold index
+        dataset.index_of_cv = fold_idx
         dataset.update_train_val_test_keys()
-        logger.info(f"Using subject {dataset.index_of_cv} as test subject")
+        
+        current_test_subject = dataset.test_keys[0]  # Extract the current test subject ID
+        
+        logger.info(f"Fold {fold_idx+1}/{len(dataset.LOCV_keys)}: Testing on Subject {current_test_subject}, Training on Subjects {dataset.train_keys}")
 
-        # Create data loaders
-        train_loader = get_data(dataset, args.batch_size, flag="train")
-        valid_loader = get_data(dataset, args.batch_size, flag="valid")
-        test_loader = get_data(dataset, args.batch_size, flag="test")
+        # Create data loaders - use classifier batch size if training classifier
+        batch_size = args.classifier_batch_size if args.train_classifier else args.batch_size
+        train_loader = get_data(dataset, batch_size, flag="train")
+        valid_loader = get_data(dataset, batch_size, flag="valid") 
+        test_loader = get_data(dataset, batch_size, flag="test")
+        
+        # Set save paths for current fold
+        fold_dir = f"fold_{fold_idx+1}_subj_{current_test_subject}"
+        encoder_save_path = os.path.join(args.encoder_save_path, f"{args.encoder_type}_{timestamp}", fold_dir)
+        classifier_save_path = os.path.join(args.classifier_save_path, f"{args.encoder_type}_{timestamp}", fold_dir)
+        
+        # Create directories and save fold information
+        os.makedirs(encoder_save_path, exist_ok=True)
+        os.makedirs(classifier_save_path, exist_ok=True)
+        
+        # Save fold details
+        with open(os.path.join(classifier_save_path, "fold_info.txt"), "w") as f:
+            f.write(f"Fold: {fold_idx+1}/{len(dataset.LOCV_keys)}\n")
+            f.write(f"Test Subject: {current_test_subject}\n")
+            f.write(f"Train Subjects: {dataset.train_keys}\n")
+            f.write(f"Data Split: train={len(train_loader.dataset)}, valid={len(valid_loader.dataset)}, test={len(test_loader.dataset)} samples\n")
+            f.write(f"Encoder Type: {args.encoder_type}\n")
+            f.write(f"Timestamp: {timestamp}\n")
 
-        # Set save paths
-        encoder_save_path = os.path.join(args.encoder_save_path, f"{args.encoder_type}_{timestamp}", str(dataset.index_of_cv))
-        classifier_save_path = os.path.join(args.classifier_save_path, f"{args.encoder_type}_{timestamp}", str(dataset.index_of_cv))
-
-        # ============Step 1: Encoder Training============
+         # ============Step 1: Encoder Training============
         if args.train_encoder:
-            logger.info("Starting encoder training...")
+            logger.info(f"Training encoder for fold {fold_idx+1}, test subject {current_test_subject}")
             
-            # Create encoder model
+            # Create encoder
             encoder = create_encoder(args)
             
             # Initialize encoder trainer
@@ -66,40 +101,44 @@ if __name__ == '__main__':
             # Train encoder
             encoder = encoder_trainer.train(train_loader, valid_loader)
             
-            logger.info("Encoder training completed!")
+            logger.info(f"Encoder training completed for fold {fold_idx+1}")
         
         # ============Step 2: Classifier Training============
         if args.train_classifier:
-            logger.info("Starting classifier training...")
+            logger.info(f"Training classifier for fold {fold_idx+1}, test subject {current_test_subject}")
+            
+            # Set classifier training parameters
+            args.learning_rate = args.classifier_lr
+            args.train_epochs = args.classifier_epochs
             
             # Load encoder
             encoder = create_encoder(args)
             if args.load_encoder:
-                # Use specified encoder path if available
                 encoder_path = args.encoder_path
             else:
-                # Otherwise use the encoder just trained
                 encoder_path = os.path.join(encoder_save_path, "best_model.pth")
             
-            # Load pretrained encoder
+            # Load the encoder
             encoder = load_pretrained_encoder(encoder, encoder_path)
             
-            # Create classifier model
+            # Configure whether to freeze encoder parameters
+            if args.freeze_encoder:
+                logger.info("Freezing encoder parameters during classifier training")
+                for param in encoder.parameters():
+                    param.requires_grad = False
+            
+            # Create and train classifier
             classifier = create_classifier(args, encoder)
-            
-            # Initialize classifier trainer
             classifier_trainer = ClassifierTrainer(args, classifier, classifier_save_path)
-            
-            # Train classifier
             classifier = classifier_trainer.train(train_loader, valid_loader)
             
-            logger.info("Classifier training completed!")
+            logger.info(f"Classifier training completed for fold {fold_idx+1}")
         
         # ============Step 3: Testing============
         if args.test:
-            logger.info(f"Starting testing (test subject: {dataset.index_of_cv})")
+            logger.info(f"Testing on subject {current_test_subject} (fold {fold_idx+1})")
             
-            # Load final model
+            # Load models
             encoder = create_encoder(args)
             encoder = load_pretrained_encoder(encoder, os.path.join(encoder_save_path, "best_model.pth"))
             classifier = create_classifier(args, encoder)
@@ -108,36 +147,22 @@ if __name__ == '__main__':
             checkpoint = torch.load(os.path.join(classifier_save_path, "best_model.pth"), map_location=args.device)
             classifier.load_state_dict(checkpoint['model_state_dict'])
             
-            # Perform testing
+            # Set current test subject and fold index for result tracking
+            args.test_subject = current_test_subject
+            args.fold_idx = fold_idx + 1
+            
+            # Evaluate on test set (left-out subject)
             acc, f_w, f_macro, f_micro = evaluate_classifier(args, classifier, test_loader, classifier_save_path)
             
-            # Save performance metrics
-            acc_list.append(acc)
-            f_w_list.append(f_w)
-            f_macro_list.append(f_macro)
-            f_micro_list.append(f_micro)
-            
-            # Report overall performance after testing the last subject
-            # Indicates completion of cross-validation across all subjects
-            if test_sub == 8:
-                results_path = os.path.join(args.classifier_save_path, f"{args.encoder_type}_{timestamp}")
-                if not os.path.exists(results_path):
-                    os.makedirs(results_path)
-                
-                # Log overall results
-                logger.info("\n===== Overall Performance Summary =====")
-                logger.info(f"Model: {args.encoder_type}_{timestamp}")
-                logger.info(f"Accuracy: mean={np.mean(acc_list):.7f}, std={np.std(acc_list):.7f}")
-                logger.info(f"F1 Weighted: mean={np.mean(f_w_list):.7f}, std={np.std(f_w_list):.7f}")
-                logger.info(f"F1 Macro: mean={np.mean(f_macro_list):.7f}, std={np.std(f_macro_list):.7f}")
-                logger.info(f"F1 Micro: mean={np.mean(f_micro_list):.7f}, std={np.std(f_micro_list):.7f}")
-                
-                # # Save results to file
-                # with open(os.path.join(results_path, "overall_results.txt"), "a") as f:
-                #     f.write(f"Model: {args.encoder_type}_{timestamp}\n")
-                #     f.write(f"Accuracy: mean={np.mean(acc_list):.7f}, std={np.std(acc_list):.7f}\n")
-                #     f.write(f"F1 Weighted: mean={np.mean(f_w_list):.7f}, std={np.std(f_w_list):.7f}\n")
-                #     f.write(f"F1 Macro: mean={np.mean(f_macro_list):.7f}, std={np.std(f_macro_list):.7f}\n")
-                #     f.write(f"F1 Micro: mean={np.mean(f_micro_list):.7f}, std={np.std(f_micro_list):.7f}\n")
+            # Store results for this fold
+            results['subject_id'].append(current_test_subject)
+            results['accuracy'].append(acc)
+            results['f1_weighted'].append(f_w)
+            results['f1_macro'].append(f_macro)
+            results['f1_micro'].append(f_micro)
+    
+    # Summarize all fold results if testing was performed
+    if args.test and len(results['subject_id']) > 0:
+        save_results_summary(results, args, timestamp)
     
     logger.info("All processes completed successfully.") 

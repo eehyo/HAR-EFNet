@@ -46,7 +46,11 @@ poetry install
    python HAR_SSL/main.py -d pamap2 -e cnn --train_encoder False --train_classifier True --test False --load_encoder True --encoder_path /path/to/encoder.pth
    ```
 
-### 3. End-to-End
+### 3. End-to-End (all subjects)
 ```bash
    python HAR_SSL/main.py -d pamap2 -e cnn --train_encoder True --train_classifier True --test True
+   ```
+### 4. End-to-End (specific subject)
+```bash
+   python HAR_SSL/main.py --train_encoder=True --train_classifier=True --test=True --specific_subject=5
    ```

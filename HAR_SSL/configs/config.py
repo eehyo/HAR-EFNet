@@ -31,8 +31,11 @@ def get_args():
     parser.add_argument('--load_encoder', default=False, type=str2bool, help='Load pre-trained encoder')
     parser.add_argument('--encoder_path', default=None, type=str, help='Path to pre-trained encoder')
     
-    args = parser.parse_args()
+    # LOOCV settings
+    parser.add_argument('--specific_subject', default=None, type=int, help='Test only specific subject (1-8), None to test all subjects')
     
+    args = parser.parse_args()
+        
     # data config
     config_file = open('HAR_SSL/configs/data.yaml', mode='r')
     data_config = yaml.load(config_file, Loader=yaml.FullLoader)
@@ -43,6 +46,7 @@ def get_args():
     args.save_path = "saved"
     args.encoder_save_path = os.path.join(args.save_path, "encoders")
     args.classifier_save_path = os.path.join(args.save_path, "classifiers")
+    args.results_save_path = os.path.join(args.save_path, "results")
     
     args.use_gpu = torch.cuda.is_available()
     args.device = torch.device("cuda" if args.use_gpu else "cpu")
@@ -55,7 +59,7 @@ def get_args():
     args.datanorm_type = "standardization"
     
     # training settings
-    args.train_epochs = 150
+    args.train_epochs = 3
     args.learning_rate = 0.0005
     args.learning_rate_patience = 7
     args.learning_rate_factor = 0.1
@@ -64,6 +68,11 @@ def get_args():
     args.shuffle = True
     args.drop_last = False
     args.train_vali_quote = 0.90
+
+    args.classifier_lr = 0.001
+    args.classifier_epochs = 50
+    args.classifier_batch_size = 64
+    args.freeze_encoder = True  # Freeze
     
     # Time series input settings
     window_seconds = data_config["window_seconds"]

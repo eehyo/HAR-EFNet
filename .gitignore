@@ -1,0 +1,87 @@
+# Python 관련
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 가상환경
+.env
+.venv
+env/
+venv/
+ENV/
+.poetry/
+.python-version
+
+# IDE 관련
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+.DS_Store
+.spyderproject
+.spyproject
+.ropeproject
+.projectile
+
+# 로그 및 임시 파일
+logs/
+*.log
+*.tmp
+*.md
+
+# 데이터 파일
+datasets/
+data/
+archive/
+HAR_train/
+*.csv
+*.npy
+*.npz
+*.h5
+*.pkl
+*.json
+
+# 모델 파일
+saved/
+*.pth
+*.pt
+*.ckpt
+*.model
+wandb/
+
+# 테스트 관련
+.coverage
+.coverage.*
+.pytest_cache/
+htmlcov/
+coverage.xml
+*.cover
+.mypy_cache/
+.ruff_cache/
+
+# OS 관련
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
