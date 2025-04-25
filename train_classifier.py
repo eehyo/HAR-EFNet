@@ -6,6 +6,7 @@ import yaml
 from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
+from typing import Tuple, List, Dict, Any, Optional, Union
 
 from classifiers.classifier_base import ClassifierModel
 from train_encoder import create_encoder, load_pretrained_encoder
@@ -20,7 +21,7 @@ class ClassifierTrainer:
     """
     Classifier trainer class
     """
-    def __init__(self, args, model, save_path):
+    def __init__(self, args: Any, model: nn.Module, save_path: str):
         """
         Initialize trainer
         
@@ -61,7 +62,7 @@ class ClassifierTrainer:
         self.learning_rate_adapter = adjust_learning_rate(args, verbose=True,
                                                       logger_name=f"lr_classifier_{args.encoder_type}")
     
-    def train_epoch(self, train_loader):
+    def train_epoch(self, train_loader: DataLoader) -> Tuple[float, float]:
         """
         Train one epoch
         
@@ -69,7 +70,7 @@ class ClassifierTrainer:
             train_loader: Training data loader
             
         Returns:
-            Training loss, epoch time
+            Training loss, epoch time in seconds
         """
         self.model.train()
         train_loss = []
@@ -98,7 +99,7 @@ class ClassifierTrainer:
         
         return train_loss, epoch_time
     
-    def validate(self, valid_loader):
+    def validate(self, valid_loader: DataLoader) -> Tuple[float, float, float, float, float]:
         """
         Validate model
         
@@ -144,7 +145,7 @@ class ClassifierTrainer:
         
         return valid_loss, acc, f_w, f_macro, f_micro
     
-    def train(self, train_loader, valid_loader):
+    def train(self, train_loader: DataLoader, valid_loader: DataLoader) -> nn.Module:
         """
         Complete training process
         
@@ -191,7 +192,7 @@ class ClassifierTrainer:
         self.logger.info("Classifier training completed")
         return self.model
 
-def create_classifier(args, encoder):
+def create_classifier(args: Any, encoder: nn.Module) -> ClassifierModel:
     """
     Create classifier model
     
@@ -205,9 +206,11 @@ def create_classifier(args, encoder):
     # Initialize logger
     logger = Logger("classifier_creator")
     
-    # Load model configuration
-    config_file = open('configs/model.yaml', mode='r')
-    model_config = yaml.load(config_file, Loader=yaml.FullLoader)
+    # Load model configuration - use relative path for flexibility
+    config_path = os.path.join(os.path.dirname(__file__), 'configs', 'model.yaml')
+    with open(config_path, mode='r') as config_file:
+        model_config = yaml.load(config_file, Loader=yaml.FullLoader)
+    
     classifier_config = model_config['classifier']
     
     # Create classifier model
@@ -220,9 +223,10 @@ def create_classifier(args, encoder):
     logger.info(f"Created classifier with {args.num_classes} classes")
     return model
 
-def evaluate_classifier(args, model, test_loader, save_path=None):
+def evaluate_classifier(args: Any, model: nn.Module, test_loader: DataLoader, 
+                      save_path: Optional[str] = None) -> Tuple[float, float, float, float]:
     """
-    Evaluate classifier
+    Evaluate classifier on test data
     
     Args:
         args: Configuration parameters
@@ -231,7 +235,7 @@ def evaluate_classifier(args, model, test_loader, save_path=None):
         save_path: Path to save results (optional)
         
     Returns:
-        Accuracy, F1 scores (weighted, macro, micro)
+        Tuple of (accuracy, F1 weighted score, F1 macro score, F1 micro score)
     """
     logger = Logger(f"eval_classifier_{args.encoder_type}")
     logger.info("Testing classifier...")
@@ -289,15 +293,5 @@ def evaluate_classifier(args, model, test_loader, save_path=None):
             f.write(f"F1 Macro: {f_macro:.7f}\n")
             f.write(f"F1 Micro: {f_micro:.7f}\n")
             f.write("-" * 50 + "\n")
-            
-        # # Save confusion matrix
-        # if len(np.unique(true_labels)) > 1:  # Only if we have multiple classes
-        #     cm = confusion_matrix(true_labels, predictions)
-            
-        #     # Save confusion matrix to file
-        #     cm_file = os.path.join(save_path, "confusion_matrix.txt")
-        #     with open(cm_file, "a") as f:
-        #         f.write(f"Confusion Matrix for Subject {test_subject} (Fold {fold_idx}):\n")
-        #         f.write(str(cm) + "\n\n")
     
     return acc, f_w, f_macro, f_micro 

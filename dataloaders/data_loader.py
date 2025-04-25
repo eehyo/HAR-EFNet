@@ -11,9 +11,9 @@ def get_data(dataset, batch_size, flag="train"):
         shuffle_flag = True
     else:
         shuffle_flag = False
-    # (1, 168, 9)
+    # (168, 9)
     dataset = Dataset(dataset, flag)
-    # (128, 1, 168, 9)
+    # (128, 168, 9)
     data_loader = DataLoader(dataset,
                              batch_size = batch_size,
                              shuffle = shuffle_flag,

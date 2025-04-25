@@ -37,7 +37,7 @@ def get_args():
     args = parser.parse_args()
         
     # data config
-    config_file = open('HAR_SSL/configs/data.yaml', mode='r')
+    config_file = open('HAR_EFNet/configs/data.yaml', mode='r')
     data_config = yaml.load(config_file, Loader=yaml.FullLoader)
     data_config = data_config[args.data_name]
     
@@ -84,7 +84,7 @@ def get_args():
     
     # ECDF feature dimension
     args.n_ecdf_points = 25
-    args.output_size = 234  # 26차원(25개 포인트+평균) × 9채널(3축 × 3부위)
+    args.output_size = 234  
     
     # Random seed and other settings
     args.sensor_select = ["acc"]

@@ -14,15 +14,13 @@ from train_encoder import create_encoder, load_pretrained_encoder, EncoderTraine
 from train_classifier import create_classifier, ClassifierTrainer, evaluate_classifier
 
 if __name__ == '__main__': 
-    # args in configs/config.py
     args = get_args()
 
     # Timestamp
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     args.timestamp = timestamp
     
-    # Initialize logger
-    logger = Logger(f"har_ssl_{args.encoder_type}")
+    logger = Logger(f"har_{args.encoder_type}")
 
     # Random Seed
     set_seed(args.seed)
@@ -40,20 +38,17 @@ if __name__ == '__main__':
         'f1_macro': [],
         'f1_micro': []
     }
-
-    # Configure which subjects to run for LOOCV
-    all_subjects = list(range(1, 9))  # Subject IDs 1-8
     
     # Filter to specific subject if requested
     if args.specific_subject is not None:
-        fold_range = [args.specific_subject - 1]  # Convert Subject ID to fold index (0-based)
+        fold_range = [args.specific_subject - 1] 
         logger.info(f"Restricting training/evaluation: Testing only Subject {args.specific_subject}")
     else:
         fold_range = range(len(dataset.LOCV_keys))
         logger.info(f"Running all {len(dataset.LOCV_keys)} subjects")
 
-    # Cross-validation for each test subject (LOOCV - Leave One Out Cross Validation)
-    logger.info(f"Starting {len(fold_range)}-fold Leave-One-Out Cross Validation")
+    # Cross-validation for each test subject
+    logger.info(f"Starting {len(fold_range)}-fold")
     
     for fold_idx in fold_range:
         # Set dataset state to the specified fold index
@@ -92,13 +87,8 @@ if __name__ == '__main__':
         if args.train_encoder:
             logger.info(f"Training encoder for fold {fold_idx+1}, test subject {current_test_subject}")
             
-            # Create encoder
             encoder = create_encoder(args)
-            
-            # Initialize encoder trainer
             encoder_trainer = EncoderTrainer(args, encoder, encoder_save_path)
-            
-            # Train encoder
             encoder = encoder_trainer.train(train_loader, valid_loader)
             
             logger.info(f"Encoder training completed for fold {fold_idx+1}")
@@ -107,18 +97,15 @@ if __name__ == '__main__':
         if args.train_classifier:
             logger.info(f"Training classifier for fold {fold_idx+1}, test subject {current_test_subject}")
             
-            # Set classifier training parameters
             args.learning_rate = args.classifier_lr
             args.train_epochs = args.classifier_epochs
             
-            # Load encoder
             encoder = create_encoder(args)
             if args.load_encoder:
                 encoder_path = args.encoder_path
             else:
                 encoder_path = os.path.join(encoder_save_path, "best_model.pth")
             
-            # Load the encoder
             encoder = load_pretrained_encoder(encoder, encoder_path)
             
             # Configure whether to freeze encoder parameters
@@ -154,7 +141,6 @@ if __name__ == '__main__':
             # Evaluate on test set (left-out subject)
             acc, f_w, f_macro, f_micro = evaluate_classifier(args, classifier, test_loader, classifier_save_path)
             
-            # Store results for this fold
             results['subject_id'].append(current_test_subject)
             results['accuracy'].append(acc)
             results['f1_weighted'].append(f_w)

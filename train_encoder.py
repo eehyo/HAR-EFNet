@@ -5,6 +5,7 @@ import numpy as np
 from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset
 import yaml
+from typing import Tuple, Dict, List, Optional, Any, Union
 
 from encoders import CNNEncoder, LSTMEncoder
 from dataloaders.data_utils import compute_ecdf_features, compute_batch_ecdf_features
@@ -18,7 +19,7 @@ class EncoderTrainer:
     """
     ECDF feature prediction encoder training class
     """
-    def __init__(self, args, model, save_path):
+    def __init__(self, args: Any, model: nn.Module, save_path: str):
         """
         Initialize the encoder trainer
         
@@ -58,7 +59,7 @@ class EncoderTrainer:
         self.learning_rate_adapter = adjust_learning_rate(args, verbose=True, 
                                                       logger_name=f"lr_encoder_{args.encoder_type}")
     
-    def train_epoch(self, train_loader):
+    def train_epoch(self, train_loader: DataLoader) -> Tuple[float, float]:
         """
         Train one epoch
         
@@ -66,14 +67,13 @@ class EncoderTrainer:
             train_loader: Training data loader
             
         Returns:
-            Training loss, epoch time
+            Training loss, epoch time in seconds
         """
         self.model.train()
         train_loss = []
         epoch_time = time.time()
         batch_count = 0
-        # batch_x.shape: (128, 1, 168, 9)
-        # batch_x.shape: (64, 1, 168, 9)
+        # batch_x.shape: (128, 168, 9)
         for batch_x, _ in train_loader:  # label is not needed for ECDF features
             batch_count += 1
             self.logger.debug(f"Processing batch #{batch_count} in train epoch")
@@ -82,8 +82,8 @@ class EncoderTrainer:
             batch_x = batch_x.float().to(self.device)
             
             # Compute ECDF features (Ground Truth)
-            batch_ecdf = compute_batch_ecdf_features(batch_x.cpu().numpy())
-            batch_ecdf = torch.tensor(batch_ecdf).float().to(self.device)
+            batch_ecdf = torch.tensor(compute_batch_ecdf_features(batch_x), 
+                                    dtype=torch.float32).to(self.device)
             
             # Predict ECDF features
             predicted_ecdf = self.model(batch_x)
@@ -103,7 +103,7 @@ class EncoderTrainer:
         
         return train_loss, epoch_time
     
-    def validate(self, valid_loader):
+    def validate(self, valid_loader: DataLoader) -> float:
         """
         Validate model
         
@@ -124,8 +124,8 @@ class EncoderTrainer:
                 
                 batch_x = batch_x.float().to(self.device)
                 
-                batch_ecdf = compute_batch_ecdf_features(batch_x.cpu().numpy())
-                batch_ecdf = torch.tensor(batch_ecdf).float().to(self.device)
+                batch_ecdf = torch.tensor(compute_batch_ecdf_features(batch_x), 
+                                        dtype=torch.float32).to(self.device)
                 
                 predicted_ecdf = self.model(batch_x)
                 
@@ -138,7 +138,7 @@ class EncoderTrainer:
         
         return valid_loss
     
-    def train(self, train_loader, valid_loader):
+    def train(self, train_loader: DataLoader, valid_loader: DataLoader) -> nn.Module:
         """
         Complete training process
         
@@ -178,41 +178,8 @@ class EncoderTrainer:
         self.logger.info("Encoder training completed")
         return self.model
 
-    def save_checkpoint(self, val_loss, model, save_path, metric=None):
-        """
-        Save model checkpoint when validation loss decreases
-        
-        Args:
-            val_loss: Validation loss
-            model: Model to save
-            save_path: Path to save model
-            metric: Additional metric (optional)
-        """
-        if self.verbose:
-            self.logger.info(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}). Saving model...')
-        
-        # path check
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-        
-        # 실행 ID를 포함한 파일 이름으로 저장
-        run_id = Logger.get_run_id()
-        model_path = os.path.join(save_path, f'best_model_{run_id}.pth')
-        
-        # save model state and metadata
-        checkpoint = {
-            'model_state_dict': model.state_dict(),
-            'val_loss': val_loss,
-            'run_id': run_id
-        }
-        
-        if metric is not None:
-            checkpoint['metric'] = metric
-            
-        torch.save(checkpoint, model_path)
-        self.val_loss_min = val_loss
 
-def create_encoder(args):
+def create_encoder(args: Any) -> nn.Module:
     """
     Create encoder model based on configuration
     
@@ -222,7 +189,6 @@ def create_encoder(args):
     Returns:
         Created encoder model
     """
-    # Initialize logger for encoder creation
     logger = Logger("encoder_creator")
     
     # Convert args to dict
@@ -233,10 +199,12 @@ def create_encoder(args):
         'device': args.device
     }
     
-    # Load model configuration
-    config_file = open('HAR_SSL/configs/model.yaml', mode='r')
-    model_config = yaml.load(config_file, Loader=yaml.FullLoader)
-    encoder_config = model_config['ssl_encoder']
+    # Load model configuration - use relative path for flexibility
+    config_path = os.path.join(os.path.dirname(__file__), 'configs', 'model.yaml')
+    with open(config_path, mode='r') as config_file:
+        model_config = yaml.load(config_file, Loader=yaml.FullLoader)
+    
+    encoder_config = model_config['efnet_encoder']
     
     # Add parameters based on encoder type
     if args.encoder_type == 'cnn':
@@ -248,33 +216,45 @@ def create_encoder(args):
     elif args.encoder_type == 'lstm':
         encoder_args.update(encoder_config['lstm'])
         encoder = LSTMEncoder(encoder_args)
-    #     hidden_size = encoder_args.get('hidden_size', 'unknown')
-    #     num_layers = encoder_args.get('num_layers', 'unknown')
-    #     bidirectional = encoder_args.get('bidirectional', 'unknown')
-    #     logger.info(f"Created LSTM encoder with hidden size {hidden_size}, layers {num_layers}, bidirectional={bidirectional}")
+        # hidden_size = encoder_args.get('hidden_size', 'unknown')
+        # num_layers = encoder_args.get('num_layers', 'unknown')
+        # bidirectional = encoder_args.get('bidirectional', 'unknown')
+        # logger.info(f"Created LSTM encoder with hidden size {hidden_size}, layers {num_layers}, bidirectional={bidirectional}")
     else:
         logger.error(f"Unsupported encoder type: {args.encoder_type}")
         raise ValueError(f"Unsupported encoder type: {args.encoder_type}")
     
     return encoder
 
-def load_pretrained_encoder(encoder, path):
+def load_pretrained_encoder(encoder: nn.Module, path: str) -> nn.Module:
     """
-    Load pretrained encoder weights
+    Load pretrained encoder weights from checkpoint file
     
     Args:
-        encoder: Encoder model
-        path: Path to weights file
+        encoder: Encoder model instance
+        path: Path to checkpoint file
         
     Returns:
         Encoder with loaded weights
+        
+    Raises:
+        FileNotFoundError: If the checkpoint file doesn't exist
+        RuntimeError: If there's an error loading the state dict
     """
     logger = Logger("encoder_loader")
     logger.info(f"Loading pretrained encoder from: {path}")
     
-    checkpoint = torch.load(path, map_location=encoder.device)
-    encoder.load_state_dict(checkpoint['model_state_dict'])
-    logger.info(f"Successfully loaded model with validation loss: {checkpoint.get('val_loss', 'N/A')}")
-
+    if not os.path.exists(path):
+        logger.error(f"Checkpoint file not found: {path}")
+        raise FileNotFoundError(f"Checkpoint file not found: {path}")
+    
+    try:
+        checkpoint = torch.load(path, map_location=encoder.device)
+        encoder.load_state_dict(checkpoint['model_state_dict'])
+        val_loss = checkpoint.get('val_loss', 'N/A')
+        logger.info(f"Successfully loaded model with validation loss: {val_loss}")
+    except Exception as e:
+        logger.error(f"Error loading checkpoint: {str(e)}")
+        raise RuntimeError(f"Failed to load checkpoint: {str(e)}")
     
     return encoder 

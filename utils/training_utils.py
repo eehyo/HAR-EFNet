@@ -7,7 +7,6 @@ from scipy.fftpack import fft, fftfreq, ifft
 
 from .logger import Logger
 
-# Make sure logger is initialized
 if not hasattr(Logger, '_run_id') or Logger._run_id is None:
     Logger.initialize(log_dir='logs')
 
@@ -205,7 +204,6 @@ def save_results_summary(results, args, timestamp):
     # List of subjects that were tested
     tested_subjects = ", ".join([str(s) for s in results['subject_id']])
     
-    # Create logger for results
     logger = Logger(f"results_{args.encoder_type}")
     
     # Log overall performance
@@ -236,7 +234,7 @@ def save_results_summary(results, args, timestamp):
             f.write("-" * 50 + "\n\n")
         
         # Overall summary
-        f.write("===== LOOCV Performance Summary =====\n")
+        f.write("===== Performance Summary =====\n")
         f.write(f"Accuracy: mean={mean_acc:.7f}, std={std_acc:.7f}\n")
         f.write(f"F1 Weighted: mean={mean_f_w:.7f}, std={std_f_w:.7f}\n")
         f.write(f"F1 Macro: mean={mean_f_macro:.7f}, std={std_f_macro:.7f}\n")

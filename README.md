@@ -1,26 +1,32 @@
-### Attribution
+# HAR-EFNet: Human Activity Recognition with ECDF Feature Network
 
-This project incorporates code from the following sources:
+## Introduction
 
-- [ISWC22-HAR](https://github.com/teco-kit/ISWC22-HAR), developed by Zhou et al., as described in their paper:  
-  Zhou, Y.; Zhao, H.; Huang, Y.; Hefenbrock, M.; Riedel, T.; Beigl, M. (2022). *TinyHAR: A Lightweight Deep Learning Model Designed for Human Activity Recognition*. International Symposium on Wearable Computers (ISWC’22). DOI: [10.1145/3544794.3558467](https://doi.org/10.1145/3544794.3558467)
+This project implements a Human Activity Recognition (HAR) system using ECDF-based feature prediction for representation learning. The system is designed to recognize 12 distinct human activities from IMU sensor data using a two-stage training pipeline:
 
-- [VNN](https://github.com/FlyingGiraffe/vnn), developed by Lee et al., as described in their paper:  
-  Lee, J., Park, J., Kim, Y., Kim, H. (2021). *VNN: Virtual Node Neural Network for Graph Classification*. Proceedings of the 30th ACM International Conference on Information and Knowledge Management (CIKM ‘21). DOI: [10.1145/3459637.3482383](https://doi.org/10.1145/3459637.3482383)
+1.	Encoder Training (Supervised Regression)
+A neural encoder is trained to predict 234-dimensional ECDF (Empirical Cumulative Distribution Function) features from raw IMU signals using MSE loss.
 
+2.	Activity Classification
+After training, the encoder is used as a fixed feature extractor. A separate classifier is then trained on top of the predicted ECDF features to recognize 12 distinct human activities.
+
+## Project Structure
 ```
-HAR_SSL/
+HAR-EFNet/
 ├── configs/                
 │   ├── config.py           
-│   └── model.yaml          
+│   ├── model.yaml          
+│   └── data.yaml
 ├── dataloaders/            
 │   ├── data_loader.py      
 │   └── data_utils.py       
 ├── encoders/              
 │   ├── __init__.py         
-│   ├── cnn_encoder.py      
-│   └── lstm_encoder.py    
-├── classifiers/            
+│   ├── base.py
+│   ├── cnn_encoder.py
+│   └── lstm_encoder.py   
+├── classifiers/  
+│   ├── __init__.py           
 │   └── classifier_base.py  
 ├── utils/                  
 │   ├── __init__.py         
@@ -28,7 +34,19 @@ HAR_SSL/
 │   └── logger.py           
 ├── main.py                 
 ├── train_encoder.py        
-└── train_classifier.py    
+└── train_classifier.py
+```
+
+Additional directories created during execution:
+```
+HAR-EFNet/
+├── logs/
+│   ├── debug/ 
+│   └── training/
+└── saved/
+    ├── encoders/
+    ├── classifiers/
+    └── results/
 ```
 
 ### The dependencies can be installed by:
@@ -38,19 +56,20 @@ poetry install
 
 ### 1. Train Encoder
 ```bash
-   python HAR_SSL/main.py -d pamap2 -e cnn --train_encoder True --train_classifier False --test False
-   ```
+python main.py -d pamap2 -e cnn --train_encoder True --train_classifier False --test False
+```
 
-### 2. Train Evaluator
+### 2. Train Classifier with Pre-trained Encoder
 ```bash
-   python HAR_SSL/main.py -d pamap2 -e cnn --train_encoder False --train_classifier True --test False --load_encoder True --encoder_path /path/to/encoder.pth
-   ```
+python main.py -d pamap2 -e cnn --train_encoder False --train_classifier True --test False --load_encoder True --encoder_path /path/to/encoder.pth
+```
 
-### 3. End-to-End (all subjects)
+### 3. End-to-End Training and Testing (all subjects)
 ```bash
-   python HAR_SSL/main.py -d pamap2 -e cnn --train_encoder True --train_classifier True --test True
-   ```
-### 4. End-to-End (specific subject)
+python main.py -d pamap2 -e cnn --train_encoder True --train_classifier True --test True
+```
+
+### 4. End-to-End for Specific Subject
 ```bash
-   python HAR_SSL/main.py --train_encoder=True --train_classifier=True --test=True --specific_subject=5
-   ```
+python main.py -d pamap2 -e cnn --train_encoder True --train_classifier True --test True --specific_subject 5
+``` 

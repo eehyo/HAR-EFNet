@@ -1,4 +1,4 @@
-ssl_encoder:
+efnet_encoder:
   encoder_type: cnn
   
   cnn:
@@ -13,6 +13,5 @@ ssl_encoder:
     dropout_rate: 0.3
 
 classifier:
-  freeze_encoder: True  # 인코더 파라미터 고정 여부
-  classifier_hidden: [256, 128]  # 분류 헤드의 은닉층 차원
+  classifier_hidden: [256, 128]  
   dropout_rate: 0.5 

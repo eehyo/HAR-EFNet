@@ -1,20 +1,25 @@
 import torch
 import torch.nn as nn
+from typing import Dict, Any, List, Optional, Union
 
 class ClassifierModel(nn.Module):
     """
     Classifier model based on pretrained encoder
     
     This model combines a pretrained encoder with a classification head
+    to perform activity recognition using extracted ECDF features
     """
-    def __init__(self, encoder, num_classes, config):
+    def __init__(self, encoder: nn.Module, num_classes: int, config: Dict[str, Any]):
         """
         Initialize classifier
         
         Args:
-            encoder: Pretrained encoder
-            num_classes: Number of classes to classify
-            config: Configuration for the classifier
+            encoder: Pretrained encoder model used as feature extractor
+            num_classes: Number of activity classes to classify
+            config: Configuration dictionary for the classifier with keys:
+                - classifier_hidden: List of hidden layer sizes
+                - dropout_rate: Dropout probability
+                - freeze_encoder: Whether to freeze encoder parameters
         """
         super(ClassifierModel, self).__init__()
         
@@ -44,7 +49,7 @@ class ClassifierModel(nn.Module):
         if config.get('freeze_encoder', True):
             self.freeze_encoder()
     
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass
         
@@ -62,14 +67,14 @@ class ClassifierModel(nn.Module):
         
         return logits
     
-    def freeze_encoder(self):
+    def freeze_encoder(self) -> None:
         """
         Freeze encoder parameters to train only the classification head
         """
         for param in self.encoder.parameters():
             param.requires_grad = False
     
-    def unfreeze_encoder(self):
+    def unfreeze_encoder(self) -> None:
         """
         Make encoder parameters trainable again
         """

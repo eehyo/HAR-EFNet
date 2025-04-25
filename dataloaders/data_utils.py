@@ -1,30 +1,24 @@
 import numpy as np
 import torch
+from typing import Union, Tuple, List, Optional
 
 import scipy as sp
 from scipy.fftpack import fft, fftfreq, ifft
 
-def compute_ecdf_features(window_data, n_points=25):
+def compute_ecdf_features(window_data: Union[np.ndarray, torch.Tensor], n_points: int = 25) -> np.ndarray:
     """
     Feature extraction based on ECDF (Empirical Cumulative Distribution Function)
     
     Args:
-        window_data: Input time series data [window_size, channels] or [1, window_size, channels]
+        window_data: Input time series data [window_size, channels] 
         n_points: Number of points to extract from each time series (default: 25)
     
     Returns:
-        ECDF feature vector [(n_points + 1) * 9] ((25+1)*9 = 234 dimensions)
+        ECDF feature vector of shape [(n_points + 1) * 9] with 234 dimensions
+        Each channel contributes n_points ECDF points + 1 mean value
     """
     if isinstance(window_data, torch.Tensor):
-        window_data = window_data.numpy()
-    # Channel order: [x_hand, y_hand, z_hand, x_chest, y_chest, z_chest, x_ankle, y_ankle, z_ankle]
-    # Or in the form of [acc_x_hand, acc_y_hand, acc_z_hand, ...]
-
-    # window_data.shape: (169, 9)
-
-    # Handle 3D input (batch_size=1, window_size, channels)
-    # if len(window_data.shape) == 3:
-    #     window_data = window_data.squeeze(0)  # Remove batch dimension
+        window_data = window_data.detach().cpu().numpy()
     
     channels = window_data.shape[1]
     if channels != 9 and channels != 18:
@@ -59,7 +53,7 @@ def compute_ecdf_features(window_data, n_points=25):
     
     return ecdf_features.astype(np.float32)
 
-def compute_batch_ecdf_features(batch_data):
+def compute_batch_ecdf_features(batch_data: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
     """
     Calculate ECDF features for batch data
     
@@ -69,6 +63,10 @@ def compute_batch_ecdf_features(batch_data):
     Returns:
         Batch ECDF features [batch_size, (n_points+1)*9]
     """
+    # Convert PyTorch tensor to NumPy if needed
+    if isinstance(batch_data, torch.Tensor):
+        batch_data = batch_data.detach().cpu().numpy()
+        
     batch_size = batch_data.shape[0]
     features = np.zeros((batch_size, 234))  # (n_points+1)*9 = (25+1)*9 = 234
     
@@ -77,7 +75,7 @@ def compute_batch_ecdf_features(batch_data):
     
     return features
 
-def get_ecdf_dimension():
+def get_ecdf_dimension() -> int:
     """
     Return dimension of ECDF features
     

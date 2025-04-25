@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Tuple
 
 from .base import EncoderBase
 
@@ -10,7 +11,7 @@ class ConvBlock(nn.Module):
     """
     A single 1D convolution block
     """
-    def __init__(self, in_channels, out_channels, kernel_size=5, stride=1, dropout_rate=0.3):
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int = 5, stride: int = 1, dropout_rate: float = 0.3):
         super(ConvBlock, self).__init__()
         self.conv = nn.Conv1d(
             in_channels=in_channels,
@@ -23,7 +24,7 @@ class ConvBlock(nn.Module):
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout_rate)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.conv(x)
         x = self.bn(x)
         x = self.relu(x)
@@ -35,7 +36,7 @@ class CNNEncoder(EncoderBase):
     CNN-based encoder for ECDF feature regression
     Uses multiple convolution blocks and a regression head
     """
-    def __init__(self, args):
+    def __init__(self, args: dict):
         super(CNNEncoder, self).__init__(args)
         
         self.dropout_rate = args.get('dropout_rate', 0.3)
@@ -82,24 +83,16 @@ class CNNEncoder(EncoderBase):
             nn.Linear(256, self.output_size)
         )
     
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        forward pass
+        Forward pass of the CNN encoder
         
         Args:
-            x: input data [batch_size, 1, window_size, input_channels]
+            x: Input data [batch_size, window_size, input_channels]
             
         Returns:
-            encoder output [batch_size, output_size]
+            encoder output [batch_size, output_size] - ECDF feature predictions
         """
-        # 정적 카운터로 호출 횟수 추적
-        # 배치 횟수만큼 호출
-        if not hasattr(self.__class__, 'forward_call_count'):
-            self.__class__.forward_call_count = 0
-        self.__class__.forward_call_count += 1
-        
-        print(f"Forward call #{self.__class__.forward_call_count}, Input shape: {x.shape}")
-
         # Rearrange input to match Conv1d requirement: [B, C, T]
         # (128, 168, 9) -> (128, 9, 168)
         x = x.permute(0, 2, 1)
@@ -113,12 +106,14 @@ class CNNEncoder(EncoderBase):
         #     # 3차원 입력 [B, T, C] -> [B, C, T]
         #     x = x.permute(0, 2, 1)
         
-        print(f"Transformed input shape: {x.shape}")
+        # Pass through convolutional blocks
         for conv_block in self.conv_blocks:
             x = conv_block(x)
         
+        # Global pooling
         x = self.max_pool(x).squeeze(-1)
         
+        # Regression head
         x = self.regressor(x)
         
         return x 
