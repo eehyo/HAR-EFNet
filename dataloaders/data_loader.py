@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import random
+import pickle
 from torch.utils.data import DataLoader
 
 from .data_utils import Normalizer,components_selection_one_signal
@@ -36,6 +37,10 @@ class PAMAP2(object):
         self.all_keys = [1,2,3,4,5,6,7,8]
 
         self.index_of_cv = 0
+        
+        # Set up cache directory for processed data
+        self.cache_dir = os.path.join(self.data_path, 'processed_cache')
+        os.makedirs(self.cache_dir, exist_ok=True)
 
         # if self.exp_mode == "LOCV":
         #     self.num_of_cv = len(self.LOCV_keys)
@@ -115,21 +120,83 @@ class PAMAP2(object):
 
         self.sub_ids_of_each_sub = {}
 
-        # dataset
-        self.data_x, self.data_y = self.load_all_the_data(self.data_path)
+        # Generate path for data cache file
+        data_cache_filename = self._get_cache_filename("data")
+        
+        # Check if cached data exists and load it
+        if os.path.exists(data_cache_filename) and not args.reprocess_data:
+            self.data_x, self.data_y = self.load_processed_data(data_cache_filename)
+            print(f"Loaded preprocessed data from {data_cache_filename}")
+        else:
+            # Process data from raw files and save
+            self.data_x, self.data_y = self.load_all_the_data(self.data_path)
+            
+            # noise, gravitational force filtering
+            if self.args.filtering:
+                self.data_x = self.Sensor_data_noise_grav_filtering(self.data_x.set_index('sub_id').copy())
+                
+            # Save processed data to cache
+            self.save_processed_data(self.data_x, self.data_y, data_cache_filename)
+            print(f"Saved preprocessed data to {data_cache_filename}")
 
-        # noise, gravitational force filtering
-        if self.args.filtering:
-            self.data_x = self.Sensor_data_noise_grav_filtering(self.data_x.set_index('sub_id').copy())
+        # Generate paths for sliding window cache files
+        train_window_cache = self._get_cache_filename("train_window")
+        test_window_cache = self._get_cache_filename("test_window")
+        
+        # Check if cached sliding windows exist and load them
+        if os.path.exists(train_window_cache) and os.path.exists(test_window_cache) and not args.reprocess_data:
+            self.train_slidingwindows = self.load_sliding_windows(train_window_cache)
+            self.test_slidingwindows = self.load_sliding_windows(test_window_cache)
+            print(f"Loaded sliding windows from cache")
+        else:
+            # Generate sliding window indices
+            self.train_slidingwindows = self.get_the_sliding_index(self.data_x.copy(), self.data_y.copy(), "train")
+            self.test_slidingwindows = self.get_the_sliding_index(self.data_x.copy(), self.data_y.copy(), "test")
+            
+            # Save sliding window indices to cache
+            self.save_sliding_windows(self.train_slidingwindows, train_window_cache)
+            self.save_sliding_windows(self.test_slidingwindows, test_window_cache)
+            print(f"Saved sliding windows to cache")
 
-        ####################################################################    
-        # TODO: data_x, data_y pkl 저장
-
-        # sliding window indexing
-        self.train_slidingwindows = self.get_the_sliding_index(self.data_x.copy(), self.data_y.copy(), "train")
-        self.test_slidingwindows  = self.get_the_sliding_index(self.data_x.copy(), self.data_y.copy(), "test")
-
-
+    def _get_cache_filename(self, cache_type):
+        """Generate cache filename based on current settings
+        
+        Creates a unique filename that depends on filtering options, 
+        sensor selection, window size, and cache type.
+        """
+        filtering_str = "filtered" if self.args.filtering else "raw"
+        sensor_select_str = "_".join(self.args.sensor_select) if self.args.sensor_select else "all"
+        window_str = f"window{self.windowsize}"
+        
+        cache_name = f"pamap2_{filtering_str}_{sensor_select_str}_{window_str}_{cache_type}.pkl"
+        return os.path.join(self.cache_dir, cache_name)
+    
+    def save_processed_data(self, data_x, data_y, filename):
+        """Save processed data as pickle file"""
+        data = {
+            'data_x': data_x,
+            'data_y': data_y
+        }
+        with open(filename, 'wb') as f:
+            pickle.dump(data, f)
+    
+    def load_processed_data(self, filename):
+        """Load processed data from pickle file"""
+        with open(filename, 'rb') as f:
+            data = pickle.load(f)
+        return data['data_x'], data['data_y']
+    
+    def save_sliding_windows(self, windows, filename):
+        """Save sliding window indices as pickle file"""
+        with open(filename, 'wb') as f:
+            pickle.dump(windows, f)
+    
+    def load_sliding_windows(self, filename):
+        """Load sliding window indices from pickle file"""
+        with open(filename, 'rb') as f:
+            windows = pickle.load(f)
+        # [index, start_idx, end_idx]
+        return windows
 
     def load_all_the_data(self, data_path):
         file_list = os.listdir(data_path)
@@ -137,6 +204,8 @@ class PAMAP2(object):
         df_dict = {}
         for file in file_list:
             if file == 'subject109.dat': continue
+            # Skip processed_cache directory
+            if file.endswith('.pkl') or not file.endswith('.dat'): continue
 
             # (408031, 54)
             sub_data = pd.read_table(os.path.join(data_path,file), header=None, sep=r'\s+')
@@ -144,10 +213,6 @@ class PAMAP2(object):
             sub_data = sub_data.iloc[:,self.used_cols]
             sub_data.columns = self.col_names
 
-            # print(f"Successfully loaded {file}")
-            # print(f"Shape of loaded data: {sub_data.shape}")
-            # print(f"Columns: {sub_data.columns.tolist()}")
-            # print(f"Data types: {sub_data.dtypes}")
 
             # if missing values, imputation
             sub_data = sub_data.interpolate(method='linear', limit_direction='both')

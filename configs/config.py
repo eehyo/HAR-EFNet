@@ -18,6 +18,7 @@ def get_args():
     
     # Dataset
     parser.add_argument('-d', '--data_name', default='pamap2', type=str, help='Name of the Dataset')
+    parser.add_argument('--reprocess_data', default=False, type=str2bool, help='Force reprocessing raw data even if cache exists')
     
     # Model
     parser.add_argument('-e', '--encoder_type', default='cnn', type=str, help='Encoder Type (cnn, lstm)')
@@ -37,7 +38,7 @@ def get_args():
     args = parser.parse_args()
         
     # data config
-    config_file = open('HAR_EFNet/configs/data.yaml', mode='r')
+    config_file = open('configs/data.yaml', mode='r')
     data_config = yaml.load(config_file, Loader=yaml.FullLoader)
     data_config = data_config[args.data_name]
     
