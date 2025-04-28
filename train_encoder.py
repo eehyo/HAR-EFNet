@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 import yaml
 from typing import Tuple, Dict, List, Optional, Any, Union
 
-from encoders import CNNEncoder, LSTMEncoder
+from encoders import CNNEncoder, LSTMEncoder, BaseEncoder
 from dataloaders.data_utils import compute_ecdf_features, compute_batch_ecdf_features
 from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
 from utils.logger import Logger
@@ -206,24 +206,26 @@ def create_encoder(args: Any) -> nn.Module:
     
     encoder_config = model_config['efnet_encoder']
     
-    # Add parameters based on encoder type
     if args.encoder_type == 'cnn':
         encoder_args.update(encoder_config['cnn'])
-        encoder = CNNEncoder(encoder_args)
-        # conv_channels = encoder_args.get('conv_channels', ['unknown'])
-        # dropout_rate = encoder_args.get('dropout_rate', 'unknown')
-        # logger.info(f"Created CNN encoder with channels {conv_channels} and dropout {dropout_rate}")
+        model_class = CNNEncoder
+        logger.info(f"Using CNN encoder configuration")
     elif args.encoder_type == 'lstm':
         encoder_args.update(encoder_config['lstm'])
-        encoder = LSTMEncoder(encoder_args)
-        # hidden_size = encoder_args.get('hidden_size', 'unknown')
-        # num_layers = encoder_args.get('num_layers', 'unknown')
-        # bidirectional = encoder_args.get('bidirectional', 'unknown')
-        # logger.info(f"Created LSTM encoder with hidden size {hidden_size}, layers {num_layers}, bidirectional={bidirectional}")
+        model_class = LSTMEncoder
+        logger.info(f"Using LSTM encoder configuration")
+    elif args.encoder_type == 'base_encoder':
+        encoder_args.update(encoder_config['base_encoder'])
+        model_class = BaseEncoder
+        logger.info(f"Using baseline encoder configuration")
     else:
         logger.error(f"Unsupported encoder type: {args.encoder_type}")
         raise ValueError(f"Unsupported encoder type: {args.encoder_type}")
     
+    # Create selected encoder model
+    encoder = model_class(encoder_args)
+    
+    logger.info(f"Created {args.encoder_type} encoder")
     return encoder
 
 def load_pretrained_encoder(encoder: nn.Module, path: str) -> nn.Module:
@@ -249,7 +251,7 @@ def load_pretrained_encoder(encoder: nn.Module, path: str) -> nn.Module:
         raise FileNotFoundError(f"Checkpoint file not found: {path}")
     
     try:
-        checkpoint = torch.load(path, map_location=encoder.device)
+        checkpoint = torch.load(path, map_location=encoder.device, weights_only=False)
         encoder.load_state_dict(checkpoint['model_state_dict'])
         val_loss = checkpoint.get('val_loss', 'N/A')
         logger.info(f"Successfully loaded model with validation loss: {val_loss}")

@@ -7,5 +7,4 @@ pamap2:
   num_classes: 12
   num_channels: 9  
   # num_channels: 18  
-  window_seconds: 5.12
-  
+  window_seconds: 5.12  # window_size: 5.12 * 33 = 168

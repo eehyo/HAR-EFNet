@@ -1,3 +1,4 @@
-from .classifier_base import ClassifierModel
+from .mlp_classifier import MLPClassifierModel
+from .base_classifier import BaseClassifierModel
 
-__all__ = ['ClassifierModel'] 
+__all__ = ['MLPClassifierModel', 'BaseClassifierModel'] 

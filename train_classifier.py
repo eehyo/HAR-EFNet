@@ -8,7 +8,8 @@ from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
 from typing import Tuple, List, Dict, Any, Optional, Union
 
-from classifiers.classifier_base import ClassifierModel
+from classifiers.mlp_classifier import MLPClassifierModel
+from classifiers.base_classifier import BaseClassifierModel
 from train_encoder import create_encoder, load_pretrained_encoder
 from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
 from utils.logger import Logger
@@ -35,7 +36,8 @@ class ClassifierTrainer:
         self.model.to(self.device)
         
         # Initialize logger
-        self.logger = Logger(f"classifier_{args.encoder_type}")
+        self.logger = Logger(f"classifier_{args.encoder_type}_{args.classifier_type}")
+        self.logger.info(f"Using device: {self.device}")
         
         # Loss function
         self.criterion = nn.CrossEntropyLoss()
@@ -58,9 +60,9 @@ class ClassifierTrainer:
         
         # Early stopping and learning rate adjustment
         self.early_stopping = EarlyStopping(patience=args.early_stop_patience, verbose=True,
-                                          logger_name=f"es_classifier_{args.encoder_type}")
+                                          logger_name=f"es_classifier_{args.encoder_type}_{args.classifier_type}")
         self.learning_rate_adapter = adjust_learning_rate(args, verbose=True,
-                                                      logger_name=f"lr_classifier_{args.encoder_type}")
+                                                      logger_name=f"lr_classifier_{args.encoder_type}_{args.classifier_type}")
     
     def train_epoch(self, train_loader: DataLoader) -> Tuple[float, float]:
         """
@@ -75,8 +77,12 @@ class ClassifierTrainer:
         self.model.train()
         train_loss = []
         epoch_time = time.time()
+        batch_count = 0
         
         for batch_x, batch_y in train_loader:
+            batch_count += 1
+            self.logger.debug(f"Processing batch #{batch_count} in training")
+            
             # Process input data
             batch_x = batch_x.float().to(self.device)
             batch_y = batch_y.long().to(self.device)
@@ -96,6 +102,7 @@ class ClassifierTrainer:
         
         epoch_time = time.time() - epoch_time
         train_loss = np.average(train_loss)
+        self.logger.info(f"Completed epoch with {batch_count} batches")
         
         return train_loss, epoch_time
     
@@ -113,9 +120,13 @@ class ClassifierTrainer:
         valid_loss = []
         predictions = []
         true_labels = []
+        batch_count = 0
         
         with torch.no_grad():
             for batch_x, batch_y in valid_loader:
+                batch_count += 1
+                self.logger.debug(f"Processing batch #{batch_count} in validation")
+                
                 # Process input data
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.long().to(self.device)
@@ -142,6 +153,7 @@ class ClassifierTrainer:
         f_w = f1_score(true_labels, predictions, average='weighted')
         f_macro = f1_score(true_labels, predictions, average='macro')
         f_micro = f1_score(true_labels, predictions, average='micro')
+        self.logger.info(f"Completed validation with {batch_count} batches")
         
         return valid_loss, acc, f_w, f_macro, f_micro
     
@@ -192,9 +204,9 @@ class ClassifierTrainer:
         self.logger.info("Classifier training completed")
         return self.model
 
-def create_classifier(args: Any, encoder: nn.Module) -> ClassifierModel:
+def create_classifier(args: Any, encoder: nn.Module) -> nn.Module:
     """
-    Create classifier model
+    Create classifier model based on configuration
     
     Args:
         args: Configuration parameters
@@ -211,16 +223,25 @@ def create_classifier(args: Any, encoder: nn.Module) -> ClassifierModel:
     with open(config_path, mode='r') as config_file:
         model_config = yaml.load(config_file, Loader=yaml.FullLoader)
     
-    classifier_config = model_config['classifier']
+    classifier_config = model_config['efnet_classifier']
     
-    # Create classifier model
-    model = ClassifierModel(
+    if args.classifier_type == 'base_classifier':
+        classifier_args = classifier_config['base_classifier']
+        model_class = BaseClassifierModel
+        logger.info(f"Using baseline classifier configuration")
+    else:
+        classifier_args = classifier_config['mlp']
+        model_class = MLPClassifierModel
+        logger.info(f"Using MLP classifier configuration")
+    
+    # Create selected classifier model
+    model = model_class(
         encoder=encoder,
         num_classes=args.num_classes,
-        config=classifier_config
+        config=classifier_args
     )
     
-    logger.info(f"Created classifier with {args.num_classes} classes")
+    logger.info(f"Created {args.classifier_type} with {args.num_classes} classes")
     return model
 
 def evaluate_classifier(args: Any, model: nn.Module, test_loader: DataLoader, 
@@ -237,8 +258,9 @@ def evaluate_classifier(args: Any, model: nn.Module, test_loader: DataLoader,
     Returns:
         Tuple of (accuracy, F1 weighted score, F1 macro score, F1 micro score)
     """
-    logger = Logger(f"eval_classifier_{args.encoder_type}")
+    logger = Logger(f"eval_classifier_{args.encoder_type}_{args.classifier_type}")
     logger.info("Testing classifier...")
+    logger.info(f"Test Subject: {args.test_subject} (Fold {args.fold_idx})")
     
     device = torch.device("cuda" if args.use_gpu else "cpu")
     model.to(device)
@@ -246,52 +268,45 @@ def evaluate_classifier(args: Any, model: nn.Module, test_loader: DataLoader,
     
     predictions = []
     true_labels = []
+    batch_count = 0
     
     with torch.no_grad():
         for batch_x, batch_y in test_loader:
+            batch_count += 1
+            logger.debug(f"Processing test batch #{batch_count}")
+            
             # Process input data
             batch_x = batch_x.float().to(device)
+            batch_y = batch_y.long().to(device)
             
-            # Model forward pass
+            # Model forward pass and predictions
             outputs = model(batch_x)
-            
-            # Save predictions and labels
             pred = outputs.argmax(dim=1).cpu().numpy()
-            true = batch_y.numpy()
+            true = batch_y.cpu().numpy()
             
             predictions.extend(pred)
             true_labels.extend(true)
     
-    # Calculate performance metrics
+    logger.info(f"Completed testing with {batch_count} batches")
+    
+    # Calculate metrics
     acc = accuracy_score(true_labels, predictions)
     f_w = f1_score(true_labels, predictions, average='weighted')
     f_macro = f1_score(true_labels, predictions, average='macro')
     f_micro = f1_score(true_labels, predictions, average='micro')
     
-    # Get test subject ID and fold index from args
-    test_subject = getattr(args, 'test_subject', getattr(args, 'index_of_cv', 'Unknown'))
-    fold_idx = getattr(args, 'fold_idx', 'Unknown')
-    
     # Log results
-    logger.info(f"Test results for Subject {test_subject} (Fold {fold_idx}):")
-    logger.info(f"Accuracy: {acc:.7f}")
-    logger.info(f"F1 Weighted: {f_w:.7f}")
-    logger.info(f"F1 Macro: {f_macro:.7f}")
-    logger.info(f"F1 Micro: {f_micro:.7f}")
+    logger.info(f"Test Results:")
+    logger.info(f"Accuracy: {acc:.4f}")
+    logger.info(f"F1 Weighted: {f_w:.4f}")
+    logger.info(f"F1 Macro: {f_macro:.4f}")
+    logger.info(f"F1 Micro: {f_micro:.4f}")
     
-    # Save results
+    # Save confusion matrix
     if save_path:
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-        
-        # Save basic results
-        result_file = os.path.join(save_path, "test_results.txt")
-        with open(result_file, "a") as f:
-            f.write(f"Test results for Subject {test_subject} (Fold {fold_idx}):\n")
-            f.write(f"Accuracy: {acc:.7f}\n")
-            f.write(f"F1 Weighted: {f_w:.7f}\n")
-            f.write(f"F1 Macro: {f_macro:.7f}\n")
-            f.write(f"F1 Micro: {f_micro:.7f}\n")
-            f.write("-" * 50 + "\n")
+        cm = confusion_matrix(true_labels, predictions)
+        cm_file = os.path.join(save_path, "confusion_matrix.txt")
+        np.savetxt(cm_file, cm, fmt='%d')
+        logger.info(f"Confusion matrix saved to: {cm_file}")
     
     return acc, f_w, f_macro, f_micro 

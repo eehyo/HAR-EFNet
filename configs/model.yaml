@@ -11,7 +11,16 @@ efnet_encoder:
     num_layers: 2
     bidirectional: True
     dropout_rate: 0.3
+    
+  base_encoder:
+    dropout_rate: 0.3
 
-classifier:
-  classifier_hidden: [256, 128]  
-  dropout_rate: 0.5 
+efnet_classifier:
+  classifier_type: mlp
+  
+  mlp:
+    classifier_hidden: [256, 128]  
+    dropout_rate: 0.5
+  
+  base_classifier:
+    dropout_rate: 0.5 

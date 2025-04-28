@@ -207,7 +207,7 @@ def save_results_summary(results, args, timestamp):
     logger = Logger(f"results_{args.encoder_type}")
     
     # Log overall performance
-    logger.info("\n===== LOOCV Performance Summary =====")
+    logger.info("\n===== Performance Summary =====")
     logger.info(f"Tested Subjects: {tested_subjects}")
     logger.info(f"Accuracy: mean={mean_acc:.7f}, std={std_acc:.7f}")
     logger.info(f"F1 Weighted: mean={mean_f_w:.7f}, std={std_f_w:.7f}")

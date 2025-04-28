@@ -2,13 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Dict, Any, List, Optional, Union
 
-class ClassifierModel(nn.Module):
-    """
-    Classifier model based on pretrained encoder
-    
-    This model combines a pretrained encoder with a classification head
-    to perform activity recognition using extracted ECDF features
-    """
+class BaseClassifierModel(nn.Module):
     def __init__(self, encoder: nn.Module, num_classes: int, config: Dict[str, Any]):
         """
         Initialize classifier
@@ -19,31 +13,19 @@ class ClassifierModel(nn.Module):
             config: Configuration dictionary for the classifier with keys:
                 - classifier_hidden: List of hidden layer sizes
                 - dropout_rate: Dropout probability
-                - freeze_encoder: Whether to freeze encoder parameters
         """
-        super(ClassifierModel, self).__init__()
+        super(BaseClassifierModel, self).__init__()
         
         self.encoder = encoder
         self.encoder_output_size = encoder.get_embedding_dim()
         
-        # Build classification head
-        layers = []
-        
-        hidden_sizes = config.get('classifier_hidden', [256, 128])
+        # Use a single simple linear layer for classification head
         dropout_rate = config.get('dropout_rate', 0.5)
         
-        # Input layer
-        input_size = self.encoder_output_size
-        for hidden_size in hidden_sizes:
-            layers.append(nn.Linear(input_size, hidden_size))
-            layers.append(nn.ReLU())
-            layers.append(nn.Dropout(dropout_rate))
-            input_size = hidden_size
-        
-        # Output layer
-        layers.append(nn.Linear(input_size, num_classes))
-        
-        self.classifier = nn.Sequential(*layers)
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout_rate),
+            nn.Linear(self.encoder_output_size, num_classes)
+        )
         
         # Freeze encoder if required
         if config.get('freeze_encoder', True):

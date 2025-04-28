@@ -21,17 +21,22 @@ def get_args():
     parser.add_argument('--reprocess_data', default=False, type=str2bool, help='Force reprocessing raw data even if cache exists')
     
     # Model
-    parser.add_argument('-e', '--encoder_type', default='cnn', type=str, help='Encoder Type (cnn, lstm)')
+    parser.add_argument('-e', '--encoder_type', default='base_encoder', type=str, help='Encoder Type (cnn, lstm, base_encoder)')
+    parser.add_argument('-c', '--classifier_type', default='base_classifier', type=str, help='Classifier Type (mlp, base_classifier)')
     
     # Training mode settings
     parser.add_argument('--train_encoder', default=True, type=str2bool, help='Train Encoder')
-    parser.add_argument('--train_classifier', default=False, type=str2bool, help='Train Classifier')
-    parser.add_argument('--test', default=False, type=str2bool, help='perform testing')
+    parser.add_argument('--train_classifier', default=True, type=str2bool, help='Train Classifier')
+    parser.add_argument('--test', default=True, type=str2bool, help='perform testing')
     
     # load encoder weights
     parser.add_argument('--load_encoder', default=False, type=str2bool, help='Load pre-trained encoder')
     parser.add_argument('--encoder_path', default=None, type=str, help='Path to pre-trained encoder')
     
+    # load classifier weights
+    parser.add_argument('--load_classifier', default=False, type=str2bool, help='Load pre-trained classifier')
+    parser.add_argument('--classifier_path', default=None, type=str, help='Path to pre-trained classifier')
+
     # LOOCV settings
     parser.add_argument('--specific_subject', default=None, type=int, help='Test only specific subject (1-8), None to test all subjects')
     
@@ -60,7 +65,7 @@ def get_args():
     args.datanorm_type = "standardization"
     
     # training settings
-    args.train_epochs = 3
+    args.train_epochs = 1
     args.learning_rate = 0.0005
     args.learning_rate_patience = 7
     args.learning_rate_factor = 0.1
@@ -71,8 +76,8 @@ def get_args():
     args.train_vali_quote = 0.90
 
     args.classifier_lr = 0.001
-    args.classifier_epochs = 50
-    args.classifier_batch_size = 64
+    args.classifier_epochs = 1
+    args.classifier_batch_size = 128
     args.freeze_encoder = True  # Freeze
     
     # Time series input settings
