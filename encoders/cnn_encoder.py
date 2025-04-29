@@ -96,15 +96,6 @@ class CNNEncoder(EncoderBase):
         # Rearrange input to match Conv1d requirement: [B, C, T]
         # (128, 168, 9) -> (128, 9, 168)
         x = x.permute(0, 2, 1)
-
-        # dim mismatch
-        # # 4차원 입력 [B, 1, T, C] -> [B, C, T] 변환
-        # if len(x.shape) == 4:
-        #     # [batch_size, 1, window_size, channels] -> [batch_size, channels, window_size]
-        #     x = x.squeeze(1).permute(0, 2, 1)
-        # else:
-        #     # 3차원 입력 [B, T, C] -> [B, C, T]
-        #     x = x.permute(0, 2, 1)
         
         # Pass through convolutional blocks
         for conv_block in self.conv_blocks:

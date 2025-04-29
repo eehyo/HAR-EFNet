@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 import yaml
 from typing import Tuple, Dict, List, Optional, Any, Union
 
-from encoders import CNNEncoder, LSTMEncoder, BaseEncoder
+from encoders import CNNEncoder, LSTMEncoder, BaseEncoder, DeepConvLSTMEncoder, DeepConvLSTMAttnEncoder, SAHAREncoder
 from dataloaders.data_utils import compute_ecdf_features, compute_batch_ecdf_features
 from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
 from utils.logger import Logger
@@ -210,14 +210,32 @@ def create_encoder(args: Any) -> nn.Module:
         encoder_args.update(encoder_config['cnn'])
         model_class = CNNEncoder
         logger.info(f"Using CNN encoder configuration")
+
     elif args.encoder_type == 'lstm':
         encoder_args.update(encoder_config['lstm'])
         model_class = LSTMEncoder
         logger.info(f"Using LSTM encoder configuration")
+
     elif args.encoder_type == 'base_encoder':
         encoder_args.update(encoder_config['base_encoder'])
         model_class = BaseEncoder
         logger.info(f"Using baseline encoder configuration")
+
+    elif args.encoder_type == 'deepconvlstm':
+        encoder_args.update(encoder_config.get('deepconvlstm', {}))
+        model_class = DeepConvLSTMEncoder
+        logger.info(f"Using DeepConvLSTM encoder configuration")
+
+    elif args.encoder_type == 'deepconvlstm_attn':
+        encoder_args.update(encoder_config.get('deepconvlstm_attn', {}))
+        model_class = DeepConvLSTMAttnEncoder
+        logger.info(f"Using DeepConvLSTM with Attention encoder configuration")
+
+    elif args.encoder_type == 'sa_har':
+        encoder_args.update(encoder_config.get('sa_har', {}))
+        model_class = SAHAREncoder
+        logger.info(f"Using SA-HAR encoder configuration")
+        
     else:
         logger.error(f"Unsupported encoder type: {args.encoder_type}")
         raise ValueError(f"Unsupported encoder type: {args.encoder_type}")

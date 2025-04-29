@@ -10,6 +10,9 @@ from typing import Tuple, List, Dict, Any, Optional, Union
 
 from classifiers.mlp_classifier import MLPClassifierModel
 from classifiers.base_classifier import BaseClassifierModel
+from classifiers.deepconvlstm_classifier import DeepConvLSTMClassifier
+from classifiers.deepconvlstm_attn_classifier import DeepConvLSTMAttnClassifier
+from classifiers.sa_har_classifier import SAHARClassifier
 from train_encoder import create_encoder, load_pretrained_encoder
 from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
 from utils.logger import Logger
@@ -225,14 +228,46 @@ def create_classifier(args: Any, encoder: nn.Module) -> nn.Module:
     
     classifier_config = model_config['efnet_classifier']
     
+    # 인코더 타입에 따라 적절한 분류기 선택
     if args.classifier_type == 'base_classifier':
         classifier_args = classifier_config['base_classifier']
         model_class = BaseClassifierModel
         logger.info(f"Using baseline classifier configuration")
-    else:
+    elif args.classifier_type == 'mlp':
         classifier_args = classifier_config['mlp']
         model_class = MLPClassifierModel
         logger.info(f"Using MLP classifier configuration")
+    elif args.classifier_type == 'deepconvlstm_classifier':
+        classifier_args = classifier_config['deepconvlstm_classifier']
+        model_class = DeepConvLSTMClassifier
+        logger.info(f"Using DeepConvLSTM specific classifier configuration")
+    elif args.classifier_type == 'deepconvlstm_attn_classifier':
+        classifier_args = classifier_config['deepconvlstm_attn_classifier']
+        model_class = DeepConvLSTMAttnClassifier
+        logger.info(f"Using DeepConvLSTM-Attn specific classifier configuration")
+    elif args.classifier_type == 'sa_har_classifier':
+        classifier_args = classifier_config['sa_har_classifier']
+        model_class = SAHARClassifier
+        logger.info(f"Using SA-HAR specific classifier configuration")
+    else:
+        # 자동으로 인코더 타입에 맞는 분류기 선택
+        if args.encoder_type == 'deepconvlstm':
+            classifier_args = classifier_config['deepconvlstm_classifier']
+            model_class = DeepConvLSTMClassifier
+            logger.info(f"Auto-selecting DeepConvLSTM specific classifier for {args.encoder_type} encoder")
+        elif args.encoder_type == 'deepconvlstm_attn':
+            classifier_args = classifier_config['deepconvlstm_attn_classifier']
+            model_class = DeepConvLSTMAttnClassifier
+            logger.info(f"Auto-selecting DeepConvLSTM-Attn specific classifier for {args.encoder_type} encoder")
+        elif args.encoder_type == 'sa_har':
+            classifier_args = classifier_config['sa_har_classifier']
+            model_class = SAHARClassifier
+            logger.info(f"Auto-selecting SA-HAR specific classifier for {args.encoder_type} encoder")
+        else:
+            # 기본값으로 MLP 분류기 사용
+            classifier_args = classifier_config['mlp']
+            model_class = MLPClassifierModel
+            logger.info(f"Using default MLP classifier for {args.encoder_type} encoder")
     
     # Create selected classifier model
     model = model_class(

@@ -11,9 +11,34 @@ efnet_encoder:
     num_layers: 2
     bidirectional: True
     dropout_rate: 0.3
-    
-  base_encoder:
-    dropout_rate: 0.3
+
+  deepconvlstm:
+    nb_conv_blocks: 2
+    nb_filters: 64
+    filter_width: 5
+    batch_norm: False
+    nb_layers_lstm: 2
+    drop_prob: 0.5
+    nb_units_lstm: 128
+    # dilation: 1
+  
+  # CNN + LSTM
+  # deepconvlstm_attn_classifier와 함께 사용하기
+  deepconvlstm_attn:
+    nb_conv_blocks: 2
+    nb_filters: 64
+    filter_width: 5
+    batch_norm: False
+    nb_layers_lstm: 2
+    drop_prob: 0.5
+    nb_units_lstm: 128
+    dilation: 1
+
+  sa_har:
+    nb_units: 128
+    n_heads: 4
+    dropout_rate: 0.1
+    batch_norm: False
 
 efnet_classifier:
   classifier_type: mlp
@@ -21,6 +46,14 @@ efnet_classifier:
   mlp:
     classifier_hidden: [256, 128]  
     dropout_rate: 0.5
-  
-  base_classifier:
-    dropout_rate: 0.5 
+    
+  deepconvlstm_classifier:
+    dropout_rate: 0.5
+
+  # ATTN 분류기
+  deepconvlstm_attn_classifier:
+    dropout_rate: 0.5
+    hidden_size: 128
+    
+  sa_har_classifier:
+    dropout_rate: 0.2 
