@@ -15,7 +15,7 @@ class DeepConvLSTMAttnClassifier(nn.Module):
         # Parameter setup
         self.dropout_rate = config.get('dropout_rate', 0.5)
         
-        # Same attention structure as original DeepConvLSTM_ATTN model
+        # Attention mechanism
         self.linear_1 = nn.Linear(encoder.nb_units_lstm, encoder.nb_units_lstm)
         self.tanh = nn.Tanh()
         self.dropout_2 = nn.Dropout(0.2)
@@ -27,9 +27,9 @@ class DeepConvLSTMAttnClassifier(nn.Module):
     def forward(self, x):
         # Extract LSTM sequence features from encoder
         # Shape: [batch_size, seq_len, hidden_dim]
-        lstm_sequence = self.encoder(x)
+        lstm_sequence = self.encoder(x, return_sequences=True)
         
-        # Apply attention mechanism same as original DeepConvLSTM_ATTN model
+        # Apply attention mechanism
         context = lstm_sequence[:, :-1, :]  # All sequences except last timestep
         out = lstm_sequence[:, -1, :]      # Output of last timestep
         

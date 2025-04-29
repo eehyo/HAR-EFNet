@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .base import BaseEncoderModule
+from .base import EncoderBase
 
 class AttentionLayer(nn.Module):
     def __init__(self, d_model, n_heads):
@@ -156,19 +156,13 @@ class SensorAttention(nn.Module):
         return torch.mul(inputs, x), x
 
 
-class SAHAREncoder(BaseEncoderModule):
+class SAHAREncoder(EncoderBase):
     """
     Sensor Attention HAR Encoder
     Adapted to output ECDF features
     """
     def __init__(self, config):
-        super(SAHAREncoder, self).__init__()
-        
-        # Parse configuration
-        self.input_channels = config['input_channels']
-        self.window_size = config['window_size']
-        self.output_size = config['output_size']
-        self.device = config.get('device', 'cuda' if torch.cuda.is_available() else 'cpu')
+        super(SAHAREncoder, self).__init__(config)
         
         # Model specific parameters
         self.nb_units = config.get('nb_units', 64)

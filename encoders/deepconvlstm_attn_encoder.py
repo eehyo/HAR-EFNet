@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .base import BaseEncoderModule
+from .base import EncoderBase
 
+# same as deepconvlstm_encoder.py
 class ConvBlock(nn.Module):
     """
     Normal convolution block
@@ -36,25 +37,20 @@ class ConvBlock(nn.Module):
         return out
 
 
-class DeepConvLSTMAttnEncoder(BaseEncoderModule):
+class DeepConvLSTMAttnEncoder(EncoderBase):
     """
-    DeepConvLSTMAttnEncoder encoder without attention mechanism
+    DeepConvLSTMAttnEncoder encoder
+    - Pretraining: Uses last LSTM hidden state to predict ECDF features
+    - Classification: Provides full LSTM sequence output for attention mechanism
     """
     def __init__(self, config):
-        super(DeepConvLSTMAttnEncoder, self).__init__()
-        
-        # Parse configuration
-        self.input_channels = config['input_channels']
-        self.window_size = config['window_size']
-        self.output_size = config['output_size']
-        self.device = config.get('device', 'cuda' if torch.cuda.is_available() else 'cpu')
+        super(DeepConvLSTMAttnEncoder, self).__init__(config)
         
         # Model specific parameters
         self.nb_conv_blocks = config.get('nb_conv_blocks', 2)
         self.nb_filters = config.get('nb_filters', 64)
         self.dilation = config.get('dilation', 1)
         self.batch_norm = config.get('batch_norm', True)
-
         self.filter_width = config.get('filter_width', 5)
         self.nb_layers_lstm = config.get('nb_layers_lstm', 2)
         self.drop_prob = config.get('drop_prob', 0.5)
@@ -109,7 +105,19 @@ class DeepConvLSTMAttnEncoder(BaseEncoderModule):
         # Output layer for ECDF features
         self.fc = nn.Linear(self.nb_units_lstm, self.output_size)
     
-    def forward(self, x):
+    def forward(self, x, return_sequences=False):
+        """
+        Forward pass through encoder
+        
+        Args:
+            x: Input tensor [batch_size, window_size, input_channels]
+            return_sequences: If True, returns full LSTM sequence output,
+                             otherwise returns ECDF features (default: False)
+            
+        Returns:
+            If return_sequences=True: LSTM outputs [batch_size, seq_len, nb_units_lstm]
+            If return_sequences=False: ECDF features [batch_size, output_size]
+        """
         batch_size = x.size(0)
         
         # Reshape input for 2D convolution: [batch_size, 1, window_size, input_channels]
@@ -130,13 +138,31 @@ class DeepConvLSTMAttnEncoder(BaseEncoderModule):
         x = self.dropout(x)
         
         # Apply LSTM layers
-        for lstm_layer in self.lstm_layers:
-            x, _ = lstm_layer(x)
+        for i, lstm_layer in enumerate(self.lstm_layers):
+            if i < len(self.lstm_layers) - 1:
+                # For intermediate layers, use the full sequence
+                x, _ = lstm_layer(x)
+            else:
+                # For the last layer, we need both the output sequence and the hidden state
+                lstm_out, (h_n, _) = lstm_layer(x)
         
+        if return_sequences:
+            # For classification: return full sequence output
+            return lstm_out
+        else:
+            # For ECDF prediction (pretraining): use the last hidden state
+            last_hidden = h_n[-1]  # [batch_size, hidden_size]
+            
+            # Project to output size (ECDF features)
+            ecdf_features = self.fc(last_hidden)
+            return ecdf_features 
+        
+
         # # Apply attention mechanism
         # # [batch_size, sequence_length, hidden_dim]
         # context = x[:, :-1, :]  # All but the last time step
         # out = x[:, -1, :]      # Last time step
+        # Take the last output from the sequence
         
         # # Attention weights
         # uit = self.linear_1(context)
@@ -153,4 +179,4 @@ class DeepConvLSTMAttnEncoder(BaseEncoderModule):
         # # Project to output size (ECDF features)
         # x = self.fc(combined)
         
-        return x 
+        # return x 

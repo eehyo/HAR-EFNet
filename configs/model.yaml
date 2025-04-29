@@ -1,5 +1,4 @@
 efnet_encoder:
-  encoder_type: cnn
   
   cnn:
     kernel_size: 5
@@ -41,7 +40,6 @@ efnet_encoder:
     batch_norm: False
 
 efnet_classifier:
-  classifier_type: mlp
   
   mlp:
     classifier_hidden: [256, 128]  

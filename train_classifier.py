@@ -8,8 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
 from typing import Tuple, List, Dict, Any, Optional, Union
 
-from classifiers.mlp_classifier import MLPClassifierModel
-from classifiers.base_classifier import BaseClassifierModel
+from classifiers.mlp_classifier import MLPClassifier
 from classifiers.deepconvlstm_classifier import DeepConvLSTMClassifier
 from classifiers.deepconvlstm_attn_classifier import DeepConvLSTMAttnClassifier
 from classifiers.sa_har_classifier import SAHARClassifier
@@ -229,13 +228,9 @@ def create_classifier(args: Any, encoder: nn.Module) -> nn.Module:
     classifier_config = model_config['efnet_classifier']
     
     # 인코더 타입에 따라 적절한 분류기 선택
-    if args.classifier_type == 'base_classifier':
-        classifier_args = classifier_config['base_classifier']
-        model_class = BaseClassifierModel
-        logger.info(f"Using baseline classifier configuration")
-    elif args.classifier_type == 'mlp':
+    if args.classifier_type == 'mlp':
         classifier_args = classifier_config['mlp']
-        model_class = MLPClassifierModel
+        model_class = MLPClassifier
         logger.info(f"Using MLP classifier configuration")
     elif args.classifier_type == 'deepconvlstm_classifier':
         classifier_args = classifier_config['deepconvlstm_classifier']
@@ -266,7 +261,7 @@ def create_classifier(args: Any, encoder: nn.Module) -> nn.Module:
         else:
             # 기본값으로 MLP 분류기 사용
             classifier_args = classifier_config['mlp']
-            model_class = MLPClassifierModel
+            model_class = MLPClassifier
             logger.info(f"Using default MLP classifier for {args.encoder_type} encoder")
     
     # Create selected classifier model

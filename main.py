@@ -8,8 +8,8 @@ from dataloaders.data_loader import PAMAP2, get_data
 from utils.training_utils import set_seed, save_results_summary
 from utils.logger import Logger
 
-from encoders import CNNEncoder, LSTMEncoder, BaseEncoder, DeepConvLSTMEncoder, DeepConvLSTMAttnEncoder, SAHAREncoder
-from classifiers import MLPClassifierModel, BaseClassifierModel
+from encoders import CNNEncoder, LSTMEncoder, DeepConvLSTMEncoder, DeepConvLSTMAttnEncoder, SAHAREncoder
+from classifiers import MLPClassifier, DeepConvLSTMClassifier, DeepConvLSTMAttnClassifier, SAHARClassifier
 from train_encoder import create_encoder, load_pretrained_encoder, EncoderTrainer
 from train_classifier import create_classifier, ClassifierTrainer, evaluate_classifier
 

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Dict, Any, List, Optional, Union
 
-class MLPClassifierModel(nn.Module):
+class MLPClassifier(nn.Module):
     """
     Classifier model based on pretrained encoder
     
@@ -21,7 +21,7 @@ class MLPClassifierModel(nn.Module):
                 - dropout_rate: Dropout probability
                 - freeze_encoder: Whether to freeze encoder parameters
         """
-        super(MLPClassifierModel, self).__init__()
+        super(MLPClassifier, self).__init__()
         
         self.encoder = encoder
         self.encoder_output_size = encoder.get_embedding_dim()

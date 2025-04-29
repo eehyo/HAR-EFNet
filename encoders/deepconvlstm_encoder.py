@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .base import BaseEncoderModule
+from .base import EncoderBase
 
 class ConvBlock(nn.Module):
     """
@@ -38,19 +38,13 @@ class ConvBlock(nn.Module):
         return out
 
 
-class DeepConvLSTMEncoder(BaseEncoderModule):
+class DeepConvLSTMEncoder(EncoderBase):
     """
     DeepConvLSTM encoder model based on architecture by Ordonez and Roggen
     Adapted to output ECDF features
     """
     def __init__(self, config):
-        super(DeepConvLSTMEncoder, self).__init__()
-        
-        # Parse configuration
-        self.input_channels = config['input_channels']
-        self.window_size = config['window_size']
-        self.output_size = config['output_size']
-        self.device = config.get('device', 'cuda' if torch.cuda.is_available() else 'cpu')
+        super(DeepConvLSTMEncoder, self).__init__(config)
         
         # Model specific parameters
         self.nb_conv_blocks = config.get('nb_conv_blocks', 2)
@@ -79,11 +73,7 @@ class DeepConvLSTMEncoder(BaseEncoderModule):
             ))
         
         self.conv_blocks = nn.ModuleList(self.conv_blocks)
-        
-        # Calculate final sequence length after convolutions
-        # Each conv block halves the sequence length due to stride=2
-        final_seq_len = self.window_size // (2 ** self.nb_conv_blocks)
-        
+       
         # Define LSTM layers
         self.lstm_layers = []
         for i in range(self.nb_layers_lstm):
