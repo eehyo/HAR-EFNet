@@ -17,9 +17,7 @@ def get_args():
     parser = argparse.ArgumentParser(description='HAR encoder and classifier training')
     
     # Dataset
-    parser.add_argument('-d', '--data_name', default='pamap2', type=str, help='Name of the Dataset')
-    parser.add_argument('--reprocess_data', default=False, type=str2bool, help='Force reprocessing raw data even if cache exists')
-    
+    parser.add_argument('-d', '--data_name', default='pamap2', type=str, help='Name of the Dataset')    
     # Model
     parser.add_argument('-e', '--encoder_type', default='deepconvlstm_attn', type=str, 
                         help='Encoder Type (cnn, lstm, deepconvlstm, deepconvlstm_attn, sa_har)')
@@ -100,5 +98,10 @@ def get_args():
     args.filtering = True
     args.freq1 = 0.001
     args.freq2 = 25.0
+
+    ## saved pickle file paths - data preprocessing
+    # 1) preprocessed data x and y for all subject
+    # 2) window indices 
+    args.pkl_save_path = os.path.join("datasets", args.data_name, f"window_size_{args.window_size}")
     
     return args 

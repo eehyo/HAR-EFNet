@@ -1,9 +1,11 @@
 import os
+import pickle
 import numpy as np
 import pandas as pd
 import random
-import pickle
+from collections import Counter
 from torch.utils.data import DataLoader
+from sklearn.model_selection import train_test_split
 
 from .data_utils import Normalizer,components_selection_one_signal
 
@@ -25,22 +27,22 @@ def get_data(dataset, batch_size, flag="train"):
 class PAMAP2(object):
     def __init__(self, args):
         self.args          = args
+        self.data_name     = args.data_name
         self.data_path     = args.data_path
         self.windowsize    = args.window_size
         self.freq1         = args.freq1
         self.freq2         = args.freq2
         self.sampling_freq = args.sampling_freq
-        self.exp_mode      = args.exp_mode
+        # self.exp_mode      = args.exp_mode
+        self.pkl_save_path = args.pkl_save_path
+        self.filtering     = args.filtering
+
         self.datanorm_type = args.datanorm_type
         self.train_vali_quote = args.train_vali_quote
         self.LOCV_keys = [[1],[2],[3],[4],[5],[6],[7],[8]] # 9 omitted
         self.all_keys = [1,2,3,4,5,6,7,8]
 
         self.index_of_cv = 0
-        
-        # Set up cache directory for processed data
-        self.cache_dir = os.path.join(self.data_path, 'processed_cache')
-        os.makedirs(self.cache_dir, exist_ok=True)
 
         # if self.exp_mode == "LOCV":
         #     self.num_of_cv = len(self.LOCV_keys)
@@ -120,135 +122,95 @@ class PAMAP2(object):
 
         self.sub_ids_of_each_sub = {}
 
-        # Generate path for data cache file
-        data_cache_filename = self._get_cache_filename("data")
-        
-        # Check if cached data exists and load it
-        if os.path.exists(data_cache_filename) and not args.reprocess_data:
-            self.data_x, self.data_y = self.load_processed_data(data_cache_filename)
-            print(f"Loaded preprocessed data from {data_cache_filename}")
-        else:
-            # Process data from raw files and save
-            self.data_x, self.data_y = self.load_all_the_data(self.data_path)
-            
-            # noise, gravitational force filtering
-            if self.args.filtering:
-                self.data_x = self.Sensor_data_noise_grav_filtering(self.data_x.set_index('sub_id').copy())
-                
-            # Save processed data to cache
-            self.save_processed_data(self.data_x, self.data_y, data_cache_filename)
-            print(f"Saved preprocessed data to {data_cache_filename}")
+        # dataset
+        self.data_x, self.data_y = self.load_all_the_data(self.data_path)
 
-        # Generate paths for sliding window cache files
-        train_window_cache = self._get_cache_filename("train_window")
-        test_window_cache = self._get_cache_filename("test_window")
-        
-        # Check if cached sliding windows exist and load them
-        if os.path.exists(train_window_cache) and os.path.exists(test_window_cache) and not args.reprocess_data:
-            self.train_slidingwindows = self.load_sliding_windows(train_window_cache)
-            self.test_slidingwindows = self.load_sliding_windows(test_window_cache)
-            print(f"Loaded sliding windows from cache")
-        else:
-            # Generate sliding window indices
-            self.train_slidingwindows = self.get_the_sliding_index(self.data_x.copy(), self.data_y.copy(), "train")
-            self.test_slidingwindows = self.get_the_sliding_index(self.data_x.copy(), self.data_y.copy(), "test")
-            
-            # Save sliding window indices to cache
-            self.save_sliding_windows(self.train_slidingwindows, train_window_cache)
-            self.save_sliding_windows(self.test_slidingwindows, test_window_cache)
-            print(f"Saved sliding windows to cache")
+        # sliding window indexing
+        self.train_slidingwindows, self.activity_per_windows = self.get_the_sliding_index(self.data_x.copy(), self.data_y.copy(), "train")
+        self.test_slidingwindows, _  = self.get_the_sliding_index(self.data_x.copy(), self.data_y.copy(), "test")
 
-    def _get_cache_filename(self, cache_type):
-        """Generate cache filename based on current settings
-        
-        Creates a unique filename that depends on filtering options, 
-        sensor selection, window size, and cache type.
-        """
-        filtering_str = "filtered" if self.args.filtering else "raw"
-        sensor_select_str = "_".join(self.args.sensor_select) if self.args.sensor_select else "all"
-        window_str = f"window{self.windowsize}"
-        
-        cache_name = f"pamap2_{filtering_str}_{sensor_select_str}_{window_str}_{cache_type}.pkl"
-        return os.path.join(self.cache_dir, cache_name)
-    
-    def save_processed_data(self, data_x, data_y, filename):
-        """Save processed data as pickle file"""
-        data = {
-            'data_x': data_x,
-            'data_y': data_y
-        }
-        with open(filename, 'wb') as f:
-            pickle.dump(data, f)
-    
-    def load_processed_data(self, filename):
-        """Load processed data from pickle file"""
-        with open(filename, 'rb') as f:
-            data = pickle.load(f)
-        return data['data_x'], data['data_y']
-    
-    def save_sliding_windows(self, windows, filename):
-        """Save sliding window indices as pickle file"""
-        with open(filename, 'wb') as f:
-            pickle.dump(windows, f)
-    
-    def load_sliding_windows(self, filename):
-        """Load sliding window indices from pickle file"""
-        with open(filename, 'rb') as f:
-            windows = pickle.load(f)
-        # [index, start_idx, end_idx]
-        return windows
+
 
     def load_all_the_data(self, data_path):
-        file_list = os.listdir(data_path)
+        # if preprocessed dataset already exists in pickle file, load from the saved_data_path
+
+        saved_data_path = os.path.join(self.pkl_save_path, f"preprocessed_{self.data_name}.pickle")
+
+        if os.path.exists(saved_data_path):
+            
+            print(f"Preprocessed file exists at {saved_data_path}. \n Loading from the file path...")
+
+            with open(saved_data_path, 'rb') as f:
+                data = pickle.load(f)
+            
+            data_x = data['data_x']
+            data_y = data['data_y']
         
-        df_dict = {}
-        for file in file_list:
-            if file == 'subject109.dat': continue
-            # Skip processed_cache directory
-            if file.endswith('.pkl') or not file.endswith('.dat'): continue
+        else: # if not saved yet
 
-            # (408031, 54)
-            sub_data = pd.read_table(os.path.join(data_path,file), header=None, sep=r'\s+')
-            # (408031, 19)
-            sub_data = sub_data.iloc[:,self.used_cols]
-            sub_data.columns = self.col_names
+            print(f"Preprocessed pickle file not found at: {saved_data_path} \n Preprocessing {self.data_name}...")
+            
+            if not os.path.exists(self.pkl_save_path):
+                os.makedirs(self.pkl_save_path)
 
+            file_list = os.listdir(data_path)
+            
+            df_dict = {}
+            for file in file_list:
+                if file == 'subject109.dat': continue # due to lack of data in majority of activities
+                
+                sub_data = pd.read_table(os.path.join(data_path,file), header=None, sep=r'\s+')
+                sub_data = sub_data.iloc[:,self.used_cols]
+                sub_data.columns = self.col_names
 
-            # if missing values, imputation
-            sub_data = sub_data.interpolate(method='linear', limit_direction='both')
-            sub = int(self.file_encoding[file])
-            sub_data['sub_id'] = sub
-            sub_data["sub"] = sub
-            # (408031, 21)
+                # if missing values, imputation
+                sub_data = sub_data.interpolate(method='linear', limit_direction='both')
+                sub = int(self.file_encoding[file])
+                sub_data['sub_id'] = sub
+                sub_data["sub"] = sub
+                # (408031, 21)
 
-            if sub not in self.sub_ids_of_each_sub.keys():
-                self.sub_ids_of_each_sub[sub] = []
-            self.sub_ids_of_each_sub[sub].append(sub)
-            df_dict[self.file_encoding[file]] = sub_data   
+                if sub not in self.sub_ids_of_each_sub.keys():
+                    self.sub_ids_of_each_sub[sub] = []
+                self.sub_ids_of_each_sub[sub].append(sub)
+                df_dict[self.file_encoding[file]] = sub_data   
 
-        # (2864056, 21)
-        df_all = pd.concat(df_dict)
+            # (2864056, 21)
+            df_all = pd.concat(df_dict)
 
-        # Downsampling - Not used
-        df_all.reset_index(drop=True,inplace=True)
-        index_list = list(np.arange(0,df_all.shape[0],3))
-        # (954686, 21)
-        df_all = df_all.iloc[index_list]
+            # Downsampling - 99hz to 33hz
+            df_all.reset_index(drop=True,inplace=True)
+            index_list = list(np.arange(0,df_all.shape[0],3))
+            # (954686, 21)
+            df_all = df_all.iloc[index_list]
 
-        df_all = df_all.set_index('sub_id')
+            df_all = df_all.set_index('sub_id')
 
-        df_all["activity_id"] = df_all["activity_id"].map(self.labelToId)
+            df_all["activity_id"] = df_all["activity_id"].map(self.labelToId)
 
-        # reorder
-        if self.selected_cols:
-            df_all = df_all[self.selected_cols+["sub"]+["activity_id"]]
-        else:
-            df_all = df_all[self.col_names[1:]+["sub"]+["activity_id"]]
+            # reorder
+            if self.selected_cols:
+                df_all = df_all[self.selected_cols+["sub"]+["activity_id"]]
+            else:
+                df_all = df_all[self.col_names[1:]+["sub"]+["activity_id"]]
 
-        data_y = df_all.iloc[:,-1]
-        data_x = df_all.iloc[:,:-1]
+            data_y = df_all.iloc[:,-1]
+            data_x = df_all.iloc[:,:-1]
 
-        data_x = data_x.reset_index()
+            data_x = data_x.reset_index()
+
+            # noise, gravitational force filtering
+            if self.filtering:
+                data_x = self.Sensor_data_noise_grav_filtering(data_x.set_index('sub_id').copy())
+
+            # save in a pickle file
+            data = {
+                    'data_x': data_x,
+                    'data_y': data_y
+                    }
+            
+            with open(saved_data_path, 'wb') as f:
+                pickle.dump(data, f)
 
         return data_x, data_y
     
@@ -287,52 +249,60 @@ class PAMAP2(object):
         else:
             self.normalized_data_x = self.data_x.copy()
 
-        # window index
+        # window indexing
         all_test_keys = self.test_keys.copy()
 
         # -----------------test_window_index---------------------
-        # test_file_name = os.path.join(self.window_save_path,
-        #                                 "{}_droptrans_{}_windowsize_{}_{}_test_ID_{}.pickle".format(self.data_name, 
-        #                                                                                             self.drop_transition,
-        #                                                                                             self.exp_mode,
-        #                                                                                             self.windowsize, 
-        #                                                                                             self.index_of_cv-1))
-        # if os.path.exists(test_file_name):
-        #     with open(test_file_name, 'rb') as handle:
-        #         self.test_window_index = pickle.load(handle)
-        # else:
-        self.test_window_index = []
-        for index, window in enumerate(self.test_slidingwindows):
-            sub_id = window[0]
-            if sub_id in all_test_keys:
-                self.test_window_index.append(index)
-            # with open(test_file_name, 'wb') as handle:
-            #     pickle.dump(self.test_window_index, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        test_file_name = os.path.join(self.pkl_save_path,
+                                        "{}_test_windowsize_{}_subject_{}_filtered_{}.pickle".format(self.data_name, 
+                                                                                                    self.windowsize, 
+                                                                                                    self.index_of_cv,
+                                                                                                    self.filtering))
+        if os.path.exists(test_file_name):      # load from previously saved indices, or
+            with open(test_file_name, 'rb') as handle:
+                self.test_window_index = pickle.load(handle)
+        else:
+            self.test_window_index = []         # generate new indices 
+            for index, window in enumerate(self.test_slidingwindows):
+                sub_id = window[0]
+                if sub_id in all_test_keys:
+                    self.test_window_index.append(index)
+            
+            # save sliding window indices 
+            with open(test_file_name, 'wb') as handle:
+                pickle.dump(self.test_window_index, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         # -----------------train_vali_window_index---------------------
 
-        # train_file_name = os.path.join(self.window_save_path,
-        #                                 "{}_droptrans_{}_windowsize_{}_{}_train_ID_{}.pickle".format(self.data_name, 
-        #                                                                                             self.drop_transition,
-        #                                                                                             self.exp_mode,
-        #                                                                                             self.windowsize, 
-        #                                                                                             self.index_of_cv-1))
-        # if os.path.exists(train_file_name):
-        #     with open(train_file_name, 'rb') as handle:
-        #         train_vali_window_index = pickle.load(handle)
-        # else:
-        train_vali_window_index = []
-        for index, window in enumerate(self.train_slidingwindows):
-            sub_id = window[0]
-            if sub_id not in all_test_keys:
-                train_vali_window_index.append(index)
-            # with open(train_file_name, 'wb') as handle:
-            #     pickle.dump(train_vali_window_index, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        train_file_name = os.path.join(self.pkl_save_path,
+                                        "{}_train_windowsize_{}_subject_{}_filtered_{}.pickle".format(self.data_name, 
+                                                                                                    self.windowsize, 
+                                                                                                    self.index_of_cv,
+                                                                                                    self.filtering))
+        if os.path.exists(train_file_name):
+            with open(train_file_name, 'rb') as handle:
+                train_vali_window_index = pickle.load(handle)
+        else:
+            train_vali_window_index = []
+            for index, window in enumerate(self.train_slidingwindows):
+                sub_id = window[0]
+                if sub_id not in all_test_keys:
+                    train_vali_window_index.append(index)
+            
+            # save sliding window indices 
+            with open(train_file_name, 'wb') as handle:
+                pickle.dump(train_vali_window_index, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        random.shuffle(train_vali_window_index)
-        # train valid split
-        self.train_window_index = train_vali_window_index[:int(self.train_vali_quote*len(train_vali_window_index))]
-        self.vali_window_index = train_vali_window_index[int(self.train_vali_quote*len(train_vali_window_index)):]
+        # random.shuffle(train_vali_window_index)
+
+        # self.train_window_index = train_vali_window_index[:int(self.train_vali_quote*len(train_vali_window_index))]
+        # self.vali_window_index = train_vali_window_index[int(self.train_vali_quote*len(train_vali_window_index)):]
+
+        # train valid stratified split
+        self.train_window_index, self.vali_window_index, _, _ = self.stratified_train_valid_split(windows=train_vali_window_index, 
+                                                                                                activities=[self.activity_per_windows[i] for i in train_vali_window_index],
+                                                                                                valid_ratio=1.0-self.train_vali_quote)
+
 
     def normalization(self, train_vali, test): # test=None
         train_vali_sensors = train_vali.iloc[:,1:-1]
@@ -409,6 +379,7 @@ class PAMAP2(object):
             displacement = int(0.1 * self.windowsize)
 
         window_index = []
+        activity_per_window = []
         for index in data_x.act_block.unique():
 
             temp_df = data_x[data_x["act_block"]==index]
@@ -418,14 +389,41 @@ class PAMAP2(object):
             end   = start + self.windowsize
 
             while end <= temp_df.index[-1]+1:
-
-                if temp_df.loc[start:end-1,"activity_id"].mode().loc[0] not in self.drop_activities:
+                curr_activity = temp_df.loc[start:end-1,"activity_id"].mode().loc[0]
+                if curr_activity not in self.drop_activities:
                     window_index.append([sub_id, start, end])
+                    activity_per_window.append(curr_activity)
 
                 start = start + displacement
                 end   = start + self.windowsize
 
-        return window_index
+        return window_index, activity_per_window
+    
+    def stratified_train_valid_split(self, windows, activities, valid_ratio=0.1):
+        """
+        Parameters:
+        - windows: Array of windows (ex.[sub, start, end])
+        - activities: Array of corresponding class labels
+        - valid_ratio: Desired validation set proportion (e.g., 0.1 for 10%)
+        - random_state: Seed for reproducibility
+        """
+
+        # Check if the counts of all activities are at least 2. 
+        counts = Counter(activities)
+
+        for cls, count in counts.items():
+            if count < 2:
+                print(f"Class {self.label_map[cls]} has only {count} occurrence(s)")
+
+        # Stratified split
+        X_train, X_valid, y_train, y_valid = train_test_split(
+            windows, activities, 
+            test_size=valid_ratio, 
+            stratify=activities, 
+            random_state=self.args.seed
+        )
+        
+        return X_train, X_valid, y_train, y_valid
     
     def Sensor_filter_acoording_to_pos_and_type(self, select, filter, all_col_names, filtertype):
         """
