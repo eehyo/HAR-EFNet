@@ -97,8 +97,29 @@ class DeepConvLSTMEncoder(EncoderBase):
         
         # Output layer for ECDF features
         self.fc = nn.Linear(self.nb_units_lstm, self.output_size)
+        
+        # Store output size of feature extractor for get_embedding_dim
+        self.embedding_dim = self.nb_units_lstm
     
-    def forward(self, x):
+    def get_embedding_dim(self) -> int:
+        """
+        Get the dimension of the encoder's feature embedding
+        
+        Returns:
+            Feature embedding dimension
+        """
+        return self.embedding_dim
+    
+    def get_embedding(self, x):
+        """
+        Extract feature embeddings without applying regression head
+        
+        Args:
+            x: Input tensor of shape [batch_size, window_size, input_channels]
+            
+        Returns:
+            Extracted feature embeddings [batch_size, nb_units_lstm]
+        """
         batch_size = x.size(0)
         
         # Reshape input for 2D convolution: [batch_size, 1, window_size, input_channels]
@@ -127,7 +148,22 @@ class DeepConvLSTMEncoder(EncoderBase):
         # Get last LSTM output
         x = x[:, -1, :]
         
+        return x
+    
+    def forward(self, x):
+        """
+        Forward pass through encoder
+        
+        Args:
+            x: Input tensor [batch_size, window_size, input_channels]
+            
+        Returns:
+            ECDF features [batch_size, output_size]
+        """
+        # Get feature embeddings
+        features = self.get_embedding(x)
+        
         # Project to output size (ECDF features)
-        x = self.fc(x)
+        x = self.fc(features)
         
         return x 

@@ -96,27 +96,33 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
         # Define dropout layer
         self.dropout = nn.Dropout(self.drop_prob)
         
-        # # Attention mechanism
-        # self.linear_1 = nn.Linear(self.nb_units_lstm, self.nb_units_lstm)
-        # self.tanh = nn.Tanh()
-        # self.dropout_2 = nn.Dropout(0.2)
-        # self.linear_2 = nn.Linear(self.nb_units_lstm, 1, bias=False)
-        
         # Output layer for ECDF features
         self.fc = nn.Linear(self.nb_units_lstm, self.output_size)
+        
+        # Store output size of feature extractor for get_embedding_dim
+        self.embedding_dim = self.nb_units_lstm
     
-    def forward(self, x, return_sequences=False):
+    def get_embedding_dim(self) -> int:
         """
-        Forward pass through encoder
+        Get the dimension of the encoder's feature embedding
+        
+        Returns:
+            Feature embedding dimension
+        """
+        return self.embedding_dim
+    
+    def get_embedding(self, x, return_sequences=False):
+        """
+        Extract feature embeddings without applying regression head
         
         Args:
             x: Input tensor [batch_size, window_size, input_channels]
             return_sequences: If True, returns full LSTM sequence output,
-                             otherwise returns ECDF features (default: False)
+                            otherwise returns last hidden state (default: False)
             
         Returns:
             If return_sequences=True: LSTM outputs [batch_size, seq_len, nb_units_lstm]
-            If return_sequences=False: ECDF features [batch_size, output_size]
+            If return_sequences=False: Last hidden state [batch_size, nb_units_lstm]
         """
         batch_size = x.size(0)
         
@@ -147,16 +153,36 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
                 lstm_out, (h_n, _) = lstm_layer(x)
         
         if return_sequences:
-            # For classification: return full sequence output
+            # Return full sequence output
             return lstm_out
         else:
-            # For ECDF prediction (pretraining): use the last hidden state
+            # Return the last hidden state
             last_hidden = h_n[-1]  # [batch_size, hidden_size]
-            
-            # Project to output size (ECDF features)
-            ecdf_features = self.fc(last_hidden)
-            return ecdf_features 
+            return last_hidden
+    
+    def forward(self, x, return_sequences=False):
+        """
+        Forward pass through encoder
         
+        Args:
+            x: Input tensor [batch_size, window_size, input_channels]
+            return_sequences: If True, returns full LSTM sequence output (for classification),
+                             otherwise returns ECDF features (default: False)
+            
+        Returns:
+            If return_sequences=True: LSTM outputs [batch_size, seq_len, nb_units_lstm]
+            If return_sequences=False: ECDF features [batch_size, output_size]
+        """
+        # Get embeddings - either sequence or last hidden state
+        features = self.get_embedding(x, return_sequences)
+        
+        if return_sequences:
+            # For classification: return full sequence output
+            return features
+        else:
+            # For ECDF prediction: project to output size
+            ecdf_features = self.fc(features)
+            return ecdf_features 
 
         # # Apply attention mechanism
         # # [batch_size, sequence_length, hidden_dim]

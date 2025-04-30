@@ -83,15 +83,15 @@ class CNNEncoder(EncoderBase):
             nn.Linear(256, self.output_size)
         )
     
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def get_embedding(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass of the CNN encoder
+        Extract feature embeddings without applying regression head
         
         Args:
             x: Input data [batch_size, window_size, input_channels]
             
         Returns:
-            encoder output [batch_size, output_size] - ECDF feature predictions
+            Extracted feature embeddings [batch_size, 256]
         """
         # Rearrange input to match Conv1d requirement: [B, C, T]
         # (128, 168, 9) -> (128, 9, 168)
@@ -104,7 +104,22 @@ class CNNEncoder(EncoderBase):
         # Global pooling
         x = self.max_pool(x).squeeze(-1)
         
-        # Regression head
-        x = self.regressor(x)
+        return x
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the CNN encoder
+        
+        Args:
+            x: Input data [batch_size, window_size, input_channels]
+            
+        Returns:
+            encoder output [batch_size, output_size] - ECDF feature predictions
+        """
+        # Get embeddings from the feature extractor
+        features = self.get_embedding(x)
+        
+        # Apply regression head to predict ECDF features
+        x = self.regressor(features)
         
         return x 

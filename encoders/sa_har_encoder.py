@@ -218,8 +218,29 @@ class SAHAREncoder(EncoderBase):
         
         self.fc1 = nn.Linear(self.nb_units, 4*self.output_size)
         self.fc_out = nn.Linear(4*self.output_size, self.output_size)
+        
+        # Store embedding dimension for classifiers
+        self.embedding_dim = self.nb_units
     
-    def forward(self, x):
+    def get_embedding_dim(self) -> int:
+        """
+        Get the dimension of the encoder's feature embedding
+        
+        Returns:
+            Feature embedding dimension
+        """
+        return self.embedding_dim
+    
+    def get_embedding(self, x):
+        """
+        Extract feature embeddings without applying regression head
+        
+        Args:
+            x: Input tensor [batch_size, window_size, input_channels]
+            
+        Returns:
+            Extracted feature embeddings [batch_size, nb_units]
+        """
         batch_size = x.size(0)
         
         # Reshape for 2D convolution: [batch, 1, window_size, channels]
@@ -244,7 +265,23 @@ class SAHAREncoder(EncoderBase):
         # Apply global temporal attention
         x = self.attention_with_context(x)
         
-        x = self.fc1(x)
+        return x
+    
+    def forward(self, x):
+        """
+        Forward pass through encoder
+        
+        Args:
+            x: Input tensor [batch_size, window_size, input_channels]
+            
+        Returns:
+            ECDF features [batch_size, output_size]
+        """
+        # Get embeddings from feature extractor
+        features = self.get_embedding(x)
+        
+        # Apply regression head
+        x = self.fc1(features)
         x = self.relu(x)
         x = self.dropout(x)
         x = self.fc_out(x)

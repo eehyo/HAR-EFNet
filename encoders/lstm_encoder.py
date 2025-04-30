@@ -83,15 +83,15 @@ class LSTMEncoder(EncoderBase):
             nn.Linear(256, self.output_size)
         )
     
-    def forward(self, x):
+    def get_embedding(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass of the LSTM encoder.
-
+        Extract feature embeddings without applying regression head
+        
         Args:
             x: Input tensor of shape [batch_size, window_size, input_channels]
         
         Returns:
-            Predicted ECDF features: [batch_size, output_size]
+            Extracted feature embeddings [batch_size, lstm_output_dim * 2]
         """
         lstm_output, (h_n, c_n) = self.lstm(x)
         
@@ -109,7 +109,22 @@ class LSTMEncoder(EncoderBase):
         # Concatenate context vector with final hidden state
         combined = torch.cat([context_vector, last_hidden], dim=1)
         
-        # regression head
-        output = self.regressor(combined)
+        return combined
+    
+    def forward(self, x):
+        """
+        Forward pass of the LSTM encoder.
+
+        Args:
+            x: Input tensor of shape [batch_size, window_size, input_channels]
+        
+        Returns:
+            Predicted ECDF features: [batch_size, output_size]
+        """
+        # Get embeddings
+        features = self.get_embedding(x)
+        
+        # Apply regression head
+        output = self.regressor(features)
         
         return output 

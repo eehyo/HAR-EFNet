@@ -60,7 +60,7 @@ class MLPClassifier(nn.Module):
             Classification logits [batch_size, num_classes]
         """
         # Extract features from encoder
-        features = self.encoder(x)
+        features = self.encoder.get_embedding(x)
         
         # Predict classes with classification head
         logits = self.classifier(features)

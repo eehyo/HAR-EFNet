@@ -14,11 +14,11 @@ class DeepConvLSTMClassifier(nn.Module):
         
         # model
         self.dropout = nn.Dropout(self.dropout_rate)
-        self.fc = nn.Linear(encoder.output_size, num_classes)
+        self.fc = nn.Linear(encoder.get_embedding_dim(), num_classes)
         
     def forward(self, x):
         # extract features from encoder
-        features = self.encoder(x)
+        features = self.encoder.get_embedding(x)
         
         # apply dropout
         features = self.dropout(features)

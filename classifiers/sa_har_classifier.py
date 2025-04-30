@@ -13,14 +13,14 @@ class SAHARClassifier(nn.Module):
         self.dropout_rate = config.get('dropout_rate', 0.2)
         
         # Expands features to 4x num_classes size before final classification
-        self.fc1 = nn.Linear(encoder.output_size, 4 * num_classes)
+        self.fc1 = nn.Linear(encoder.get_embedding_dim(), 4 * num_classes)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(p=self.dropout_rate)
         self.fc_out = nn.Linear(4 * num_classes, num_classes)
         
     def forward(self, x):
         # Extract features from encoder
-        features = self.encoder(x)
+        features = self.encoder.get_embedding(x)
         
         # First FC layer
         x = self.fc1(features)

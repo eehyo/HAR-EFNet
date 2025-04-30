@@ -25,9 +25,9 @@ class DeepConvLSTMAttnClassifier(nn.Module):
         self.fc = nn.Linear(encoder.nb_units_lstm, num_classes)
         
     def forward(self, x):
-        # Extract LSTM sequence features from encoder
+        # Get LSTM sequence features from encoder
         # Shape: [batch_size, seq_len, hidden_dim]
-        lstm_sequence = self.encoder(x, return_sequences=True)
+        lstm_sequence = self.encoder.forward(x, return_sequences=True)
         
         # Apply attention mechanism
         context = lstm_sequence[:, :-1, :]  # All sequences except last timestep

@@ -52,3 +52,18 @@ class EncoderBase(nn.Module):
             Output embedding dimension
         """
         return self.output_size 
+        
+    def get_embedding(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Extract feature embeddings without applying regression head
+        
+        Args:
+            x: Input data [batch_size, window_size, input_channels]
+            
+        Returns:
+            Extracted feature embeddings
+            
+        Raises:
+            NotImplementedError: If subclass does not implement this method
+        """
+        raise NotImplementedError("Subclasses must implement get_embedding method") 
