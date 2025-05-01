@@ -467,6 +467,7 @@ class Dataset(object):
         self.class_transform = {x: i for i, x in enumerate(classes)}
 
         # (954686, 11)
+        # sub_id  acc_x_hand  acc_y_hand  acc_z_hand  ...  acc_x_ankle  acc_y_ankle  acc_z_ankle  sub
         self.data_x = dataset.normalized_data_x
         # (954686,)
         self.data_y = dataset.data_y
@@ -484,6 +485,8 @@ class Dataset(object):
         start_index = self.slidingwindows[index][1]
         end_index = self.slidingwindows[index][2]
         # sample_x.shape: (168, 9)
+        # 열 index 1부터 마지막에서 하나 전까지 선택
+        # acc_x_hand  acc_y_hand  acc_z_hand  ...  acc_x_ankle  acc_y_ankle  acc_z_ankle
         sample_x = self.data_x.iloc[start_index:end_index, 1:-1].values
         
 

@@ -90,7 +90,7 @@ def get_args():
     
     # ECDF feature dimension
     args.n_ecdf_points = 25
-    args.output_size = 234  
+    args.output_size = (3, 78) 
     
     # Random seed and other settings
     args.sensor_select = ["acc"]

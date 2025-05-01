@@ -56,6 +56,12 @@ class DeepConvLSTMEncoder(EncoderBase):
         self.drop_prob = config.get('drop_prob', 0.5)
         self.nb_units_lstm = config.get('nb_units_lstm', 128)
         
+        if isinstance(self.output_size, tuple) and len(self.output_size) == 2:
+            self.axis_dim, self.feat_per_axis = self.output_size
+            self.flat_output_size = self.axis_dim * self.feat_per_axis  # 3 * 78 = 234
+        else:
+            raise ValueError(f"Expected output_size to be a tuple (3, 78), got {self.output_size}")
+        
         # Define convolutional blocks
         self.conv_blocks = []
         for i in range(self.nb_conv_blocks):
@@ -96,7 +102,7 @@ class DeepConvLSTMEncoder(EncoderBase):
         self.dropout = nn.Dropout(self.drop_prob)
         
         # Output layer for ECDF features
-        self.fc = nn.Linear(self.nb_units_lstm, self.output_size)
+        self.fc = nn.Linear(self.nb_units_lstm, self.flat_output_size)
         
         # Store output size of feature extractor for get_embedding_dim
         self.embedding_dim = self.nb_units_lstm
@@ -158,12 +164,16 @@ class DeepConvLSTMEncoder(EncoderBase):
             x: Input tensor [batch_size, window_size, input_channels]
             
         Returns:
-            ECDF features [batch_size, output_size]
+            ECDF features [batch_size, 3, 78]
         """
         # Get feature embeddings
         features = self.get_embedding(x)
         
-        # Project to output size (ECDF features)
+        # Project to output size (flat ECDF features)
         x = self.fc(features)
+        
+        # Reshape from [batch_size, 234] to [batch_size, 3, 78]
+        batch_size = x.size(0)
+        x = x.view(batch_size, self.axis_dim, self.feat_per_axis)
         
         return x 

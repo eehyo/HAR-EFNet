@@ -172,6 +172,12 @@ class SAHAREncoder(EncoderBase):
         if not isinstance(self.batch_norm, bool):
             self.batch_norm = bool(self.batch_norm)
         
+        if isinstance(self.output_size, tuple) and len(self.output_size) == 2:
+            self.axis_dim, self.feat_per_axis = self.output_size
+            self.flat_output_size = self.axis_dim * self.feat_per_axis  # 3 * 78 = 234
+        else:
+            raise ValueError(f"Expected output_size to be a tuple (3, 78), got {self.output_size}")
+        
         # Initial convolution block
         self.first_conv = ConvBlock(
             filter_width=5,
@@ -216,8 +222,8 @@ class SAHAREncoder(EncoderBase):
         # Global temporal attention
         self.attention_with_context = AttentionWithContext(self.nb_units)
         
-        self.fc1 = nn.Linear(self.nb_units, 4*self.output_size)
-        self.fc_out = nn.Linear(4*self.output_size, self.output_size)
+        self.fc1 = nn.Linear(self.nb_units, 4*self.flat_output_size)
+        self.fc_out = nn.Linear(4*self.flat_output_size, self.flat_output_size)
         
         # Store embedding dimension for classifiers
         self.embedding_dim = self.nb_units
@@ -275,7 +281,7 @@ class SAHAREncoder(EncoderBase):
             x: Input tensor [batch_size, window_size, input_channels]
             
         Returns:
-            ECDF features [batch_size, output_size]
+            ECDF features [batch_size, 3, 78]
         """
         # Get embeddings from feature extractor
         features = self.get_embedding(x)
@@ -285,5 +291,9 @@ class SAHAREncoder(EncoderBase):
         x = self.relu(x)
         x = self.dropout(x)
         x = self.fc_out(x)
+        
+        # Reshape from [batch_size, 234] to [batch_size, 3, 78]
+        batch_size = x.size(0)
+        x = x.view(batch_size, self.axis_dim, self.feat_per_axis)
         
         return x 

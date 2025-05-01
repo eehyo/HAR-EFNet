@@ -51,6 +51,7 @@ archive/
 *.h5
 *.pkl
 *.json
+*.out
 
 # 모델 파일
 saved/

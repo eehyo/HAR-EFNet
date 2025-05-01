@@ -81,11 +81,11 @@ class EncoderTrainer:
             # Process input data
             batch_x = batch_x.float().to(self.device)
             
-            # Compute ECDF features (Ground Truth)
+            # Compute ECDF features (Ground Truth) - [batch_size, 3, 78] = [128, 3, 78]
             batch_ecdf = torch.tensor(compute_batch_ecdf_features(batch_x), 
                                     dtype=torch.float32).to(self.device)
             
-            # Predict ECDF features
+            # Predict ECDF features - [batch_size, 3, 78]
             predicted_ecdf = self.model(batch_x)
             
             loss = self.criterion(predicted_ecdf, batch_ecdf)
@@ -124,9 +124,11 @@ class EncoderTrainer:
                 
                 batch_x = batch_x.float().to(self.device)
                 
+                # Compute ECDF features (Ground Truth) - [batch_size, 3, 78]
                 batch_ecdf = torch.tensor(compute_batch_ecdf_features(batch_x), 
                                         dtype=torch.float32).to(self.device)
                 
+                # Predict ECDF features - [batch_size, 3, 78]
                 predicted_ecdf = self.model(batch_x)
                 
                 loss = self.criterion(predicted_ecdf, batch_ecdf)
@@ -195,7 +197,7 @@ def create_encoder(args: Any) -> nn.Module:
     encoder_args = {
         'input_channels': args.input_channels,
         'window_size': args.window_size,
-        'output_size': args.output_size,
+        'output_size': args.output_size, # (3, 78)
         'device': args.device
     }
     

@@ -239,3 +239,62 @@ def save_results_summary(results, args, timestamp):
         f.write(f"F1 Weighted: mean={mean_f_w:.7f}, std={std_f_w:.7f}\n")
         f.write(f"F1 Macro: mean={mean_f_macro:.7f}, std={std_f_macro:.7f}\n")
         f.write(f"F1 Micro: mean={mean_f_micro:.7f}, std={std_f_micro:.7f}\n")
+
+def visualize_confusion_matrix(true_labels, predictions, save_path, filename_prefix="confusion_matrix"):
+
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from sklearn.metrics import confusion_matrix
+    import numpy as np
+    import os
+    
+    logger = Logger("confusion_matrix_visualizer")
+    
+    # 경로 확인 및 생성
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+        
+    # 혼동 행렬 계산
+    cm = confusion_matrix(true_labels, predictions)
+    cm_percentage = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis] * 100
+    
+    # 텍스트 파일로 저장
+    cm_file = os.path.join(save_path, f"{filename_prefix}.txt")
+    with open(cm_file, 'w') as f:
+        f.write("Raw Counts:\n")
+        np.savetxt(f, cm, fmt='%d')
+        f.write("\nPercentages (%):\n")
+        np.savetxt(f, cm_percentage, fmt='%.2f')
+    
+    # 백분율만 시각화하여 저장
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(cm_percentage, annot=True, fmt='.1f', cmap='Blues') 
+    plt.title('Confusion Matrix (%)')
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
+    
+    cm_plot_file = os.path.join(save_path, f"{filename_prefix}_percent.png")
+    plt.savefig(cm_plot_file, bbox_inches='tight', dpi=300)
+    plt.close()
+    
+    plt.figure(figsize=(12, 10))
+    annot_labels = []
+    for i in range(cm.shape[0]):
+        row = []
+        for j in range(cm.shape[1]):
+            row.append(f"{cm[i, j]}\n({cm_percentage[i, j]:.1f}%)")
+        annot_labels.append(row)
+        
+    annot_array = np.array(annot_labels)
+    sns.heatmap(cm_percentage, annot=annot_array, fmt='', cmap='Blues', annot_size=9)
+    plt.title('Confusion Matrix (count & %)')
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
+    
+    combined_cm_plot_file = os.path.join(save_path, f"{filename_prefix}_combined.png")
+    plt.savefig(combined_cm_plot_file, bbox_inches='tight', dpi=300)
+    plt.close()
+    
+    logger.info(f"Confusion matrix saved to: {cm_file}, {cm_plot_file}, and {combined_cm_plot_file}")
+    
+    return [cm_file, cm_plot_file, combined_cm_plot_file]

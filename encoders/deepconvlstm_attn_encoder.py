@@ -56,6 +56,12 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
         self.drop_prob = config.get('drop_prob', 0.5)
         self.nb_units_lstm = config.get('nb_units_lstm', 128)
         
+        if isinstance(self.output_size, tuple) and len(self.output_size) == 2:
+            self.axis_dim, self.feat_per_axis = self.output_size
+            self.flat_output_size = self.axis_dim * self.feat_per_axis  # 3 * 78 = 234
+        else:
+            raise ValueError(f"Expected output_size to be a tuple (3, 78), got {self.output_size}")
+        
         # Define convolutional blocks
         self.conv_blocks = []
         for i in range(self.nb_conv_blocks):
@@ -97,7 +103,7 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
         self.dropout = nn.Dropout(self.drop_prob)
         
         # Output layer for ECDF features
-        self.fc = nn.Linear(self.nb_units_lstm, self.output_size)
+        self.fc = nn.Linear(self.nb_units_lstm, self.flat_output_size)
         
         # Store output size of feature extractor for get_embedding_dim
         self.embedding_dim = self.nb_units_lstm
@@ -167,42 +173,24 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
         Args:
             x: Input tensor [batch_size, window_size, input_channels]
             return_sequences: If True, returns full LSTM sequence output (for classification),
-                             otherwise returns ECDF features (default: False)
+                            otherwise returns ECDF features (default: False)
             
         Returns:
             If return_sequences=True: LSTM outputs [batch_size, seq_len, nb_units_lstm]
-            If return_sequences=False: ECDF features [batch_size, output_size]
+            If return_sequences=False: ECDF features [batch_size, 3, 78]
         """
         # Get embeddings - either sequence or last hidden state
         features = self.get_embedding(x, return_sequences)
         
         if return_sequences:
             # For classification: return full sequence output
-            return features
+            return features # (128, 128)
         else:
-            # For ECDF prediction: project to output size
-            ecdf_features = self.fc(features)
-            return ecdf_features 
-
-        # # Apply attention mechanism
-        # # [batch_size, sequence_length, hidden_dim]
-        # context = x[:, :-1, :]  # All but the last time step
-        # out = x[:, -1, :]      # Last time step
-        # Take the last output from the sequence
-        
-        # # Attention weights
-        # uit = self.linear_1(context)
-        # uit = self.tanh(uit)
-        # uit = self.dropout_2(uit)
-        # ait = self.linear_2(uit)
-        
-        # # Apply attention
-        # attn = torch.matmul(F.softmax(ait, dim=1).transpose(-1, -2), context).squeeze(-2)
-        
-        # # Combine attention output with last hidden state
-        # combined = out + attn
-        
-        # # Project to output size (ECDF features)
-        # x = self.fc(combined)
-        
-        # return x 
+            # For ECDF prediction: project to output size and reshape
+            x = self.fc(features)
+            
+            # Reshape from [batch_size, 234] to [batch_size, 3, 78]
+            batch_size = x.size(0)
+            x = x.view(batch_size, self.axis_dim, self.feat_per_axis)
+            
+            return x # (128, 3, 78)

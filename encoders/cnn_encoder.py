@@ -42,9 +42,11 @@ class CNNEncoder(EncoderBase):
         self.dropout_rate = args.get('dropout_rate', 0.3)
         self.encoder_type = 'cnn'
 
-        # Enforce expected output size (234-dimensional ECDF feature)
-        assert self.output_size == 234, \
-            f"Expected output_size = 234, got {self.output_size}"
+        if isinstance(self.output_size, tuple) and len(self.output_size) == 2:
+            self.axis_dim, self.feat_per_axis = self.output_size
+            self.flat_output_size = self.axis_dim * self.feat_per_axis  # 3 * 78 = 234
+        else:
+            raise ValueError(f"Expected output_size to be a tuple (3, 78), got {self.output_size}")
         
         self.conv_blocks = nn.ModuleList([
             ConvBlock(
@@ -80,7 +82,7 @@ class CNNEncoder(EncoderBase):
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(self.dropout_rate),
-            nn.Linear(256, self.output_size)
+            nn.Linear(256, self.flat_output_size)
         )
     
     def get_embedding(self, x: torch.Tensor) -> torch.Tensor:
@@ -114,12 +116,16 @@ class CNNEncoder(EncoderBase):
             x: Input data [batch_size, window_size, input_channels]
             
         Returns:
-            encoder output [batch_size, output_size] - ECDF feature predictions
+            encoder output [batch_size, 3, 78] - ECDF feature predictions
         """
         # Get embeddings from the feature extractor
         features = self.get_embedding(x)
         
-        # Apply regression head to predict ECDF features
+        # Apply regression head to predict ECDF features (flat)
         x = self.regressor(features)
+        
+        # Reshape from [batch_size, 234] to [batch_size, 3, 78]
+        batch_size = x.size(0)
+        x = x.view(batch_size, self.axis_dim, self.feat_per_axis)
         
         return x 

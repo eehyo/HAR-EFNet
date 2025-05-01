@@ -3,6 +3,8 @@ import time
 import torch
 import numpy as np
 import yaml
+import seaborn as sns
+import matplotlib.pyplot as plt
 from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
@@ -13,7 +15,7 @@ from classifiers.deepconvlstm_classifier import DeepConvLSTMClassifier
 from classifiers.deepconvlstm_attn_classifier import DeepConvLSTMAttnClassifier
 from classifiers.sa_har_classifier import SAHARClassifier
 from train_encoder import create_encoder, load_pretrained_encoder
-from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
+from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed, visualize_confusion_matrix
 from utils.logger import Logger
 
 # Make sure logger is initialized
@@ -326,17 +328,24 @@ def evaluate_classifier(args: Any, model: nn.Module, test_loader: DataLoader,
     f_micro = f1_score(true_labels, predictions, average='micro')
     
     # Log results
-    logger.info(f"Test Results:")
-    logger.info(f"Accuracy: {acc:.4f}")
-    logger.info(f"F1 Weighted: {f_w:.4f}")
-    logger.info(f"F1 Macro: {f_macro:.4f}")
-    logger.info(f"F1 Micro: {f_micro:.4f}")
+    results_str = f"Test Results: Accuracy: {acc:.4f}, F1 Weighted: {f_w:.4f}, F1 Macro: {f_macro:.4f}, F1 Micro: {f_micro:.4f}"
     
-    # Save confusion matrix
+    logger.info(results_str)
+    
+    # Save test results and confusion matrix
     if save_path:
-        cm = confusion_matrix(true_labels, predictions)
-        cm_file = os.path.join(save_path, "confusion_matrix.txt")
-        np.savetxt(cm_file, cm, fmt='%d')
-        logger.info(f"Confusion matrix saved to: {cm_file}")
+        # Save test results
+        results_file = os.path.join(save_path, "test_results.txt")
+        with open(results_file, 'w') as f:
+            f.write(results_str)
+        logger.info(f"Test results saved to: {results_file}")
+        
+        cm_files = visualize_confusion_matrix(
+            true_labels=true_labels, 
+            predictions=predictions, 
+            save_path=save_path
+        )
+        
+        logger.info(f"Results and confusion matrix visualization saved to {save_path}")
     
     return acc, f_w, f_macro, f_micro 

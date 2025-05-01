@@ -54,6 +54,12 @@ class LSTMEncoder(EncoderBase):
         
         self.encoder_type = 'lstm'
         
+        if isinstance(self.output_size, tuple) and len(self.output_size) == 2:
+            self.axis_dim, self.feat_per_axis = self.output_size
+            self.flat_output_size = self.axis_dim * self.feat_per_axis  # 3 * 78 = 234
+        else:
+            raise ValueError(f"Expected output_size to be a tuple (3, 78), got {self.output_size}")
+        
         self.directions = 2 if self.bidirectional else 1
         self.lstm_output_dim = self.hidden_size * self.directions
         
@@ -80,7 +86,7 @@ class LSTMEncoder(EncoderBase):
             nn.LayerNorm(256),
             nn.ReLU(),
             nn.Dropout(self.dropout_rate),
-            nn.Linear(256, self.output_size)
+            nn.Linear(256, self.flat_output_size)
         )
     
     def get_embedding(self, x: torch.Tensor) -> torch.Tensor:
@@ -119,12 +125,16 @@ class LSTMEncoder(EncoderBase):
             x: Input tensor of shape [batch_size, window_size, input_channels]
         
         Returns:
-            Predicted ECDF features: [batch_size, output_size]
+            Predicted ECDF features: [batch_size, 3, 78]
         """
         # Get embeddings
         features = self.get_embedding(x)
         
-        # Apply regression head
+        # Apply regression head to get flat features
         output = self.regressor(features)
+        
+        # Reshape from [batch_size, 234] to [batch_size, 3, 78]
+        batch_size = output.size(0)
+        output = output.view(batch_size, self.axis_dim, self.feat_per_axis)
         
         return output 
