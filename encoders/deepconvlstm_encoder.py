@@ -15,11 +15,11 @@ class ConvBlock(nn.Module):
         self.dilation = dilation
         self.batch_norm = batch_norm
 
-        # self.conv1 = nn.Conv2d(self.input_filters, self.nb_filters, (self.filter_width, 1), dilation=(self.dilation, 1))
-        self.conv1 = nn.Conv2d(self.input_filters, self.nb_filters, (self.filter_width, 1))
+        self.conv1 = nn.Conv2d(self.input_filters, self.nb_filters, (self.filter_width, 1), dilation=(self.dilation, 1))
+        # self.conv1 = nn.Conv2d(self.input_filters, self.nb_filters, (self.filter_width, 1))
         self.relu = nn.ReLU(inplace=True)
-        # self.conv2 = nn.Conv2d(self.nb_filters, self.nb_filters, (self.filter_width, 1), dilation=(self.dilation, 1), stride=(2,1))
-        self.conv2 = nn.Conv2d(self.nb_filters, self.nb_filters, (self.filter_width, 1), stride=(2,1))
+        self.conv2 = nn.Conv2d(self.nb_filters, self.nb_filters, (self.filter_width, 1), dilation=(self.dilation, 1), stride=(2,1))
+        # self.conv2 = nn.Conv2d(self.nb_filters, self.nb_filters, (self.filter_width, 1), stride=(2,1))
         if self.batch_norm:
             self.norm1 = nn.BatchNorm2d(self.nb_filters)
             self.norm2 = nn.BatchNorm2d(self.nb_filters)
@@ -101,8 +101,12 @@ class DeepConvLSTMEncoder(EncoderBase):
         # Define dropout layer
         self.dropout = nn.Dropout(self.drop_prob)
         
-        # Output layer for ECDF features
-        self.fc = nn.Linear(self.nb_units_lstm, self.flat_output_size)
+        # 각 ECDF 특성에 대한 독립적인 FC 레이어 생성
+        self.feature_predictors = nn.ModuleList()
+        for i in range(self.feat_per_axis):
+            # 간단한 단일 FC 레이어로 각 특성에 대한 예측
+            fc = nn.Linear(self.nb_units_lstm, self.axis_dim)
+            self.feature_predictors.append(fc)
         
         # Store output size of feature extractor for get_embedding_dim
         self.embedding_dim = self.nb_units_lstm
@@ -169,11 +173,37 @@ class DeepConvLSTMEncoder(EncoderBase):
         # Get feature embeddings
         features = self.get_embedding(x)
         
-        # Project to output size (flat ECDF features)
-        x = self.fc(features)
+        # 각 특성별로 독립적인 FC 레이어 적용
+        outputs = []
+        for i in range(self.feat_per_axis):
+            fc = self.feature_predictors[i]
+            x_feature = fc(features)
+            outputs.append(x_feature)
         
-        # Reshape from [batch_size, 234] to [batch_size, 3, 78]
-        batch_size = x.size(0)
-        x = x.view(batch_size, self.axis_dim, self.feat_per_axis)
+        # 모든 출력을 결합하여 [batch_size, 3, 78] 형태로 생성
+        x = torch.stack(outputs, dim=2)  # [batch_size, 3, 78]
         
-        return x 
+        return x
+    
+    def calculate_loss(self, predictions: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """
+        Calculate loss for each ECDF feature independently
+        
+        Args:
+            predictions: Predicted ECDF features [batch_size, 3, 78]
+            targets: Target ECDF features [batch_size, 3, 78]
+            
+        Returns:
+            Total loss and per-feature losses
+        """
+        total_loss = 0
+        feature_losses = []
+        
+        for i in range(self.feat_per_axis):
+            feature_pred = predictions[:, :, i]  # [batch_size, 3]
+            feature_target = targets[:, :, i]    # [batch_size, 3]
+            feature_loss = F.mse_loss(feature_pred, feature_target)
+            feature_losses.append(feature_loss)
+            total_loss += feature_loss
+        
+        return total_loss, feature_losses 

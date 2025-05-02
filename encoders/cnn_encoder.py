@@ -72,18 +72,17 @@ class CNNEncoder(EncoderBase):
         # Max pooling
         self.max_pool = nn.AdaptiveMaxPool1d(1)
         
-        # Regression head
-        self.regressor = nn.Sequential(
-            nn.Linear(256, 512),  
-            nn.BatchNorm1d(512),
-            nn.ReLU(),
-            nn.Dropout(self.dropout_rate),
-            nn.Linear(512, 256),
-            nn.BatchNorm1d(256),
-            nn.ReLU(),
-            nn.Dropout(self.dropout_rate),
-            nn.Linear(256, self.flat_output_size)
-        )
+        # 각 ECDF 특성에 대한 독립적인 FC 레이어 체인 생성 (기존 regressor 구조와 동일)
+        self.feature_predictors = nn.ModuleList()
+        for i in range(self.feat_per_axis):
+            # 기존 regressor 구조와 동일하게 구성 (512->256->3)
+            fc1 = nn.Linear(256, 512)
+            bn1 = nn.BatchNorm1d(512)
+            fc2 = nn.Linear(512, 256)
+            bn2 = nn.BatchNorm1d(256)
+            fc3 = nn.Linear(256, self.axis_dim)
+            
+            self.feature_predictors.append(nn.ModuleList([fc1, bn1, fc2, bn2, fc3]))
     
     def get_embedding(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -121,11 +120,53 @@ class CNNEncoder(EncoderBase):
         # Get embeddings from the feature extractor
         features = self.get_embedding(x)
         
-        # Apply regression head to predict ECDF features (flat)
-        x = self.regressor(features)
+        # 각 특성별로 독립적인 FC 레이어 체인 적용
+        outputs = []
+        for i in range(self.feat_per_axis):
+            # 레이어 가져오기
+            fc1, bn1, fc2, bn2, fc3 = self.feature_predictors[i]
+            
+            # 첫 번째 블록
+            x_feature = fc1(features)
+            x_feature = bn1(x_feature)
+            x_feature = F.relu(x_feature)
+            x_feature = F.dropout(x_feature, p=self.dropout_rate, training=self.training)
+            
+            # 두 번째 블록
+            x_feature = fc2(x_feature)
+            x_feature = bn2(x_feature)
+            x_feature = F.relu(x_feature)
+            x_feature = F.dropout(x_feature, p=self.dropout_rate, training=self.training)
+            
+            # 출력 레이어
+            x_feature = fc3(x_feature)
+            
+            outputs.append(x_feature)
         
-        # Reshape from [batch_size, 234] to [batch_size, 3, 78]
-        batch_size = x.size(0)
-        x = x.view(batch_size, self.axis_dim, self.feat_per_axis)
+        # 모든 출력을 결합하여 [batch_size, 3, 78] 형태로 생성
+        x = torch.stack(outputs, dim=2)  # [batch_size, 3, 78]
         
-        return x 
+        return x
+    
+    def calculate_loss(self, predictions: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """
+        Calculate loss for each ECDF feature independently
+        
+        Args:
+            predictions: Predicted ECDF features [batch_size, 3, 78]
+            targets: Target ECDF features [batch_size, 3, 78]
+            
+        Returns:
+            Total loss and per-feature losses
+        """
+        total_loss = 0
+        feature_losses = []
+        
+        for i in range(self.feat_per_axis):
+            feature_pred = predictions[:, :, i]  # [batch_size, 3]
+            feature_target = targets[:, :, i]    # [batch_size, 3]
+            feature_loss = F.mse_loss(feature_pred, feature_target)
+            feature_losses.append(feature_loss)
+            total_loss += feature_loss
+        
+        return total_loss, feature_losses 

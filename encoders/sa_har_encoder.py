@@ -222,8 +222,13 @@ class SAHAREncoder(EncoderBase):
         # Global temporal attention
         self.attention_with_context = AttentionWithContext(self.nb_units)
         
-        self.fc1 = nn.Linear(self.nb_units, 4*self.flat_output_size)
-        self.fc_out = nn.Linear(4*self.flat_output_size, self.flat_output_size)
+        # 각 ECDF 특성에 대한 독립적인 FC 레이어 체인 생성 (기존 FC 구조 유지)
+        self.feature_predictors = nn.ModuleList()
+        for i in range(self.feat_per_axis):
+            # 기존 fc1, fc_out과 같은 구조 유지
+            fc1 = nn.Linear(self.nb_units, 4*self.axis_dim)
+            fc_out = nn.Linear(4*self.axis_dim, self.axis_dim)
+            self.feature_predictors.append(nn.ModuleList([fc1, fc_out]))
         
         # Store embedding dimension for classifiers
         self.embedding_dim = self.nb_units
@@ -286,14 +291,40 @@ class SAHAREncoder(EncoderBase):
         # Get embeddings from feature extractor
         features = self.get_embedding(x)
         
-        # Apply regression head
-        x = self.fc1(features)
-        x = self.relu(x)
-        x = self.dropout(x)
-        x = self.fc_out(x)
+        # 각 특성별로 독립적인 FC 레이어 체인 적용
+        outputs = []
+        for i in range(self.feat_per_axis):
+            fc1, fc_out = self.feature_predictors[i]
+            x_feature = fc1(features)
+            x_feature = self.relu(x_feature)
+            x_feature = self.dropout(x_feature)
+            x_feature = fc_out(x_feature)
+            outputs.append(x_feature)
         
-        # Reshape from [batch_size, 234] to [batch_size, 3, 78]
-        batch_size = x.size(0)
-        x = x.view(batch_size, self.axis_dim, self.feat_per_axis)
+        # 모든 출력을 결합하여 [batch_size, 3, 78] 형태로 생성
+        x = torch.stack(outputs, dim=2)  # [batch_size, 3, 78]
         
-        return x 
+        return x
+    
+    def calculate_loss(self, predictions, targets):
+        """
+        Calculate loss for each ECDF feature independently
+        
+        Args:
+            predictions: Predicted ECDF features [batch_size, 3, 78]
+            targets: Target ECDF features [batch_size, 3, 78]
+            
+        Returns:
+            Total loss and per-feature losses
+        """
+        total_loss = 0
+        feature_losses = []
+        
+        for i in range(self.feat_per_axis):
+            feature_pred = predictions[:, :, i]  # [batch_size, 3]
+            feature_target = targets[:, :, i]    # [batch_size, 3]
+            feature_loss = F.mse_loss(feature_pred, feature_target)
+            feature_losses.append(feature_loss)
+            total_loss += feature_loss
+        
+        return total_loss, feature_losses 

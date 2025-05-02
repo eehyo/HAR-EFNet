@@ -286,7 +286,7 @@ def visualize_confusion_matrix(true_labels, predictions, save_path, filename_pre
         annot_labels.append(row)
         
     annot_array = np.array(annot_labels)
-    sns.heatmap(cm_percentage, annot=annot_array, fmt='', cmap='Blues', annot_size=9)
+    sns.heatmap(cm_percentage, annot=annot_array, fmt='', cmap='Blues')
     plt.title('Confusion Matrix (count & %)')
     plt.ylabel('True Label')
     plt.xlabel('Predicted Label')

@@ -88,7 +88,11 @@ class EncoderTrainer:
             # Predict ECDF features - [batch_size, 3, 78]
             predicted_ecdf = self.model(batch_x)
             
-            loss = self.criterion(predicted_ecdf, batch_ecdf)
+
+            if hasattr(self.model, 'calculate_loss'):
+                loss, _ = self.model.calculate_loss(predicted_ecdf, batch_ecdf)
+            else:
+                loss = self.criterion(predicted_ecdf, batch_ecdf)
             
             # Backpropagation and optimization
             self.optimizer.zero_grad()
@@ -131,7 +135,10 @@ class EncoderTrainer:
                 # Predict ECDF features - [batch_size, 3, 78]
                 predicted_ecdf = self.model(batch_x)
                 
-                loss = self.criterion(predicted_ecdf, batch_ecdf)
+                if hasattr(self.model, 'calculate_loss'):
+                    loss, _ = self.model.calculate_loss(predicted_ecdf, batch_ecdf)
+                else:
+                    loss = self.criterion(predicted_ecdf, batch_ecdf)
                 
                 valid_loss.append(loss.item())
         

@@ -102,8 +102,18 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
         # Define dropout layer
         self.dropout = nn.Dropout(self.drop_prob)
         
-        # Output layer for ECDF features
-        self.fc = nn.Linear(self.nb_units_lstm, self.flat_output_size)
+        # attention
+        self.linear_1 = nn.Linear(self.nb_units_lstm, self.nb_units_lstm)
+        self.tanh = nn.Tanh()
+        self.dropout_2 = nn.Dropout(0.2)
+        self.linear_2 = nn.Linear(self.nb_units_lstm, 1, bias=False)
+        
+        # 각 ECDF 특성에 대한 독립적인 FC 레이어 생성
+        self.feature_predictors = nn.ModuleList()
+        for i in range(self.feat_per_axis):
+            # 간단한 단일 FC 레이어로 각 특성에 대한 예측
+            fc = nn.Linear(self.nb_units_lstm, self.axis_dim)
+            self.feature_predictors.append(fc)
         
         # Store output size of feature extractor for get_embedding_dim
         self.embedding_dim = self.nb_units_lstm
@@ -162,9 +172,18 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
             # Return full sequence output
             return lstm_out
         else:
-            # Return the last hidden state
-            last_hidden = h_n[-1]  # [batch_size, hidden_size]
-            return last_hidden
+            # attention - shape: [batch_size, sequence_length, hidden_dim]
+            context = lstm_out[:, :-1, :]  
+            out = lstm_out[:, -1, :]       
+            
+            uit = self.linear_1(context)
+            uit = self.tanh(uit)
+            uit = self.dropout_2(uit)
+            ait = self.linear_2(uit)
+            attn = torch.matmul(F.softmax(ait, dim=1).transpose(-1, -2), context).squeeze(-2)
+            
+            # 어텐션이 적용된 feature를 반환
+            return out + attn
     
     def forward(self, x, return_sequences=False):
         """
@@ -186,11 +205,37 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
             # For classification: return full sequence output
             return features # (128, 128)
         else:
-            # For ECDF prediction: project to output size and reshape
-            x = self.fc(features)
+            # 각 특성별로 독립적인 FC 레이어 적용
+            outputs = []
+            for i in range(self.feat_per_axis):
+                fc = self.feature_predictors[i]
+                x_feature = fc(features)
+                outputs.append(x_feature)
             
-            # Reshape from [batch_size, 234] to [batch_size, 3, 78]
-            batch_size = x.size(0)
-            x = x.view(batch_size, self.axis_dim, self.feat_per_axis)
+            # 모든 출력을 결합하여 [batch_size, 3, 78] 형태로 생성
+            x = torch.stack(outputs, dim=2)  # [batch_size, 3, 78]
             
-            return x # (128, 3, 78)
+            return x
+    
+    def calculate_loss(self, predictions: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """
+        Calculate loss for each ECDF feature independently
+        
+        Args:
+            predictions: Predicted ECDF features [batch_size, 3, 78]
+            targets: Target ECDF features [batch_size, 3, 78]
+            
+        Returns:
+            Total loss and per-feature losses
+        """
+        total_loss = 0
+        feature_losses = []
+        
+        for i in range(self.feat_per_axis):
+            feature_pred = predictions[:, :, i]  # [batch_size, 3]
+            feature_target = targets[:, :, i]    # [batch_size, 3]
+            feature_loss = F.mse_loss(feature_pred, feature_target)
+            feature_losses.append(feature_loss)
+            total_loss += feature_loss
+        
+        return total_loss, feature_losses
