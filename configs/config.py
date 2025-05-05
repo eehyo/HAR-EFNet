@@ -20,9 +20,9 @@ def get_args():
     parser.add_argument('-d', '--data_name', default='pamap2', type=str, help='Name of the Dataset')    
     # Model
     parser.add_argument('-e', '--encoder_type', default='deepconvlstm_attn', type=str, 
-                        help='Encoder Type (cnn, lstm, deepconvlstm, deepconvlstm_attn, sa_har)')
+                        help='Encoder Type (deepconvlstm, deepconvlstm_attn, sa_har)')
     parser.add_argument('-c', '--classifier_type', default='deepconvlstm_attn_classifier', type=str, 
-                        help='Classifier Type (mlp, deepconvlstm_classifier, deepconvlstm_attn_classifier, sa_har_classifier). If not specified, will auto-select based on encoder type.')
+                        help='Classifier Type (deepconvlstm_classifier, deepconvlstm_attn_classifier, sa_har_classifier). If not specified, will auto-select based on encoder type.')
     
     # Training mode settings
     parser.add_argument('--train_encoder', default=True, type=str2bool, help='Train Encoder')

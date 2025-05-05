@@ -7,8 +7,8 @@ from torch.utils.data import DataLoader, Dataset
 import yaml
 from typing import Tuple, Dict, List, Optional, Any, Union
 
-from encoders import CNNEncoder, LSTMEncoder, DeepConvLSTMEncoder, DeepConvLSTMAttnEncoder, SAHAREncoder
-from dataloaders.data_utils import compute_ecdf_features, compute_batch_ecdf_features
+from encoders import DeepConvLSTMEncoder, DeepConvLSTMAttnEncoder, SAHAREncoder
+from dataloaders.data_utils import compute_batch_ecdf_features
 from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
 from utils.logger import Logger
 
@@ -215,17 +215,7 @@ def create_encoder(args: Any) -> nn.Module:
     
     encoder_config = model_config['efnet_encoder']
     
-    if args.encoder_type == 'cnn':
-        encoder_args.update(encoder_config['cnn'])
-        model_class = CNNEncoder
-        logger.info(f"Using CNN encoder configuration")
-
-    elif args.encoder_type == 'lstm':
-        encoder_args.update(encoder_config['lstm'])
-        model_class = LSTMEncoder
-        logger.info(f"Using LSTM encoder configuration")
-
-    elif args.encoder_type == 'deepconvlstm':
+    if  args.encoder_type == 'deepconvlstm':
         encoder_args.update(encoder_config.get('deepconvlstm', {}))
         model_class = DeepConvLSTMEncoder
         logger.info(f"Using DeepConvLSTM encoder configuration")

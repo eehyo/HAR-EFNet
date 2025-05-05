@@ -165,26 +165,6 @@ class adjust_learning_rate:
             self.counter = 0
 
 
-# def vn_c_reshape(x, time_length):
-#     # For PAMAP only!!
-
-#     # Example input: (batch, time_length, 9)
-#     # Original order: [x_hand, y_hand, z_hand, x_chest, y_chest, z_chest, x_ankle, y_ankle, z_ankle]
-#     channel_indices = [
-#         0, 3, 6,  # x for hand, chest, ankle
-#         1, 4, 7,  # y for hand, chest, ankle
-#         2, 5, 8   # z for hand, chest, ankle
-#     ]
-#     batch = x.size(0)
-
-#     # x is your input tensor of shape (batch, 1, time_length, 9)
-#     x_reordered = x[:, :, :, channel_indices]  # (batch, 1, time_length, 9)
-
-#     # Now reshape
-#     x_reshaped = x_reordered.reshape(batch, time_length, 3, 3)
-
-#     return x_reshaped
-
 def save_results_summary(results, args, timestamp):
     """Save a summary of experiment results"""
     # Create results directory
@@ -250,15 +230,12 @@ def visualize_confusion_matrix(true_labels, predictions, save_path, filename_pre
     
     logger = Logger("confusion_matrix_visualizer")
     
-    # 경로 확인 및 생성
     if not os.path.exists(save_path):
         os.makedirs(save_path)
         
-    # 혼동 행렬 계산
     cm = confusion_matrix(true_labels, predictions)
     cm_percentage = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis] * 100
     
-    # 텍스트 파일로 저장
     cm_file = os.path.join(save_path, f"{filename_prefix}.txt")
     with open(cm_file, 'w') as f:
         f.write("Raw Counts:\n")
@@ -266,7 +243,6 @@ def visualize_confusion_matrix(true_labels, predictions, save_path, filename_pre
         f.write("\nPercentages (%):\n")
         np.savetxt(f, cm_percentage, fmt='%.2f')
     
-    # 백분율만 시각화하여 저장
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm_percentage, annot=True, fmt='.1f', cmap='Blues') 
     plt.title('Confusion Matrix (%)')

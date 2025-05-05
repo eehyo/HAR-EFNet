@@ -23,11 +23,14 @@ HAR-EFNet/
 ├── encoders/              
 │   ├── __init__.py         
 │   ├── base.py
-│   ├── cnn_encoder.py
-│   └── lstm_encoder.py   
+│   ├── deepconvlstm_attn_encoder.py
+│   ├── deepconvlstm_encoder.py
+│   └── sa_har_encoder.py   
 ├── classifiers/  
-│   ├── __init__.py           
-│   └── classifier_base.py  
+│   ├── __init__.py      
+│   ├── deepconvlstm_attn_classifier.py   
+│   ├── deepconvlstm_classifier.py           
+│   └── sa_har_classifier.py  
 ├── utils/                  
 │   ├── __init__.py         
 │   ├── training_utils.py   

@@ -1,15 +1,14 @@
 efnet_encoder:
+  # cnn:
+  #   kernel_size: 5
+  #   conv_channels: [64, 128, 256]
+  #   dropout_rate: 0.3
   
-  cnn:
-    kernel_size: 5
-    conv_channels: [64, 128, 256]
-    dropout_rate: 0.3
-  
-  lstm:
-    hidden_size: 128
-    num_layers: 2
-    bidirectional: True
-    dropout_rate: 0.3
+  # lstm:
+  #   hidden_size: 128
+  #   num_layers: 2
+  #   bidirectional: True
+  #   dropout_rate: 0.3
 
   deepconvlstm:
     nb_conv_blocks: 2
@@ -22,7 +21,6 @@ efnet_encoder:
     # dilation: 1
   
   # CNN + LSTM
-  # deepconvlstm_attn_classifier와 함께 사용하기
   deepconvlstm_attn:
     nb_conv_blocks: 2
     nb_filters: 64
@@ -40,15 +38,13 @@ efnet_encoder:
     batch_norm: False
 
 efnet_classifier:
-  
-  mlp:
-    classifier_hidden: [256, 128]  
-    dropout_rate: 0.5
+  # mlp:
+  #   classifier_hidden: [256, 128]  
+  #   dropout_rate: 0.5
     
   deepconvlstm_classifier:
     dropout_rate: 0.5
 
-  # ATTN 분류기
   deepconvlstm_attn_classifier:
     dropout_rate: 0.5
     hidden_size: 128
