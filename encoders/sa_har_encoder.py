@@ -40,7 +40,7 @@ class EncoderLayer(nn.Module):
         
         d_ff = d_ff or 4*d_model
         self.ffn1 = nn.Linear(d_model, d_ff, bias=True)
-        self.relu = nn.ReLU()
+        self.relu = nn.LeakyReLU(negative_slope=0.01)
         self.ffn2 = nn.Linear(d_ff, d_model, bias=True)
          
         self.layernorm2 = nn.LayerNorm(normalized_shape=d_model, eps=1e-6)               
@@ -68,7 +68,7 @@ class AttentionWithContext(nn.Module):
         if act_fn == "tanh":
             self.activation = nn.Tanh() 
         elif act_fn == "leaky_relu":
-            self.activation = nn.LeakyReLU()
+            self.activation = nn.LeakyReLU(negative_slope=0.01)
         else:
             raise NotImplementedError
         
@@ -104,7 +104,8 @@ class ConvBlock(nn.Module):
 
         self.conv1 = nn.Conv2d(self.input_filters, self.nb_units, (self.filter_width, 1), 
                               dilation=(self.dilation, 1), padding='same')
-        self.relu = nn.ReLU(inplace=True)
+        # self.relu = nn.ReLU()
+        self.relu = nn.LeakyReLU(negative_slope=0.01, inplace=True)
         self.conv2 = nn.Conv2d(self.nb_units, 1, (self.filter_width, 1), 
                               dilation=(self.dilation, 1), stride=(1,1), padding='same')
         if self.batch_norm:
@@ -134,7 +135,9 @@ class SensorAttention(nn.Module):
                                dilation=2, padding='same')
         self.conv_f = nn.Conv2d(in_channels=nb_units, out_channels=1, kernel_size=1, 
                                padding='same')
-        self.relu = nn.ReLU()
+        # self.relu = nn.ReLU()
+        self.relu = nn.LeakyReLU(negative_slope=0.01)
+
         self.softmax = nn.Softmax(dim=3)
 
     def forward(self, inputs):
@@ -201,7 +204,7 @@ class SAHAREncoder(EncoderBase):
         )
         
         # 활성화 함수와 드롭아웃 정의
-        self.relu = nn.ReLU()
+        self.relu = nn.LeakyReLU(negative_slope=0.01)
         self.dropout = nn.Dropout(p=self.dropout_rate)
         
         # Transformer encoder layers
@@ -220,7 +223,8 @@ class SAHAREncoder(EncoderBase):
         )
         
         # Global temporal attention
-        self.attention_with_context = AttentionWithContext(self.nb_units)
+        self.attention_with_context = AttentionWithContext(self.nb_units,
+                                                           act_fn="leaky_relu")
         
         # 각 ECDF 특성에 대한 독립적인 FC 레이어 체인 생성 (기존 FC 구조 유지)
         self.feature_predictors = nn.ModuleList()

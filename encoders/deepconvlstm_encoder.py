@@ -16,10 +16,8 @@ class ConvBlock(nn.Module):
         self.batch_norm = batch_norm
 
         self.conv1 = nn.Conv2d(self.input_filters, self.nb_filters, (self.filter_width, 1), dilation=(self.dilation, 1))
-        # self.conv1 = nn.Conv2d(self.input_filters, self.nb_filters, (self.filter_width, 1))
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.LeakyReLU(negative_slope=0.01, inplace=True)
         self.conv2 = nn.Conv2d(self.nb_filters, self.nb_filters, (self.filter_width, 1), dilation=(self.dilation, 1), stride=(2,1))
-        # self.conv2 = nn.Conv2d(self.nb_filters, self.nb_filters, (self.filter_width, 1), stride=(2,1))
         if self.batch_norm:
             self.norm1 = nn.BatchNorm2d(self.nb_filters)
             self.norm2 = nn.BatchNorm2d(self.nb_filters)
