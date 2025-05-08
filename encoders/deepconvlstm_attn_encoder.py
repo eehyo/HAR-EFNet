@@ -10,7 +10,7 @@ class ConvBlock(nn.Module):
     """
     def __init__(self, filter_width, input_filters, nb_filters, dilation, batch_norm):
         super(ConvBlock, self).__init__()
-        self.filter_width = filter_width
+        self.filter_width = filter_width  #kernel
         self.input_filters = input_filters
         self.nb_filters = nb_filters
         self.dilation = dilation
@@ -24,16 +24,16 @@ class ConvBlock(nn.Module):
             self.norm1 = nn.BatchNorm2d(self.nb_filters)
             self.norm2 = nn.BatchNorm2d(self.nb_filters)
 
-    def forward(self, x):
-        out = self.conv1(x)
-        out = self.relu(out)
+    def forward(self, x): # (128, 1, 168, 9) # (128, 64, 80, 9)
+        out = self.conv1(x) # (128, 64, ((168-5)/1+1)=164, 9) # (128, 64, ((80-5)/1+1)=76, 9)
+        out = self.relu(out) # (128, 64, 164, 9) # (128, 64, 76, 9)
         if self.batch_norm:
-            out = self.norm1(out)
+            out = self.norm1(out) 
 
-        out = self.conv2(out)
-        out = self.relu(out)
+        out = self.conv2(out) # (128, 64, (164-5)/2+1=80, 9) # (128, 64, (76-5)/2+1=36, 9)
+        out = self.relu(out) # (128, 64, 80, 9) # (128, 64, 36, 9)
         if self.batch_norm:
-            out = self.norm2(out)
+            out = self.norm2(out) 
 
         return out
 
@@ -58,17 +58,17 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
         self.nb_units_lstm = config.get('nb_units_lstm', 128)
         
         if isinstance(self.output_size, tuple) and len(self.output_size) == 2:
-            self.axis_dim, self.feat_per_axis = self.output_size
+            self.axis_dim, self.feat_per_axis = self.output_size  # 3, 78
             self.flat_output_size = self.axis_dim * self.feat_per_axis  # 3 * 78 = 234
         else:
             raise ValueError(f"Expected output_size to be a tuple (3, 78), got {self.output_size}")
         
         # Define convolutional blocks
         self.conv_blocks = []
-        for i in range(self.nb_conv_blocks):
-            if i == 0:
+        for i in range(self.nb_conv_blocks):  # 2
+            if i == 0:  # 1 → 64
                 input_filters = 1  # Initial input channel
-            else:
+            else:  # 64 → 64
                 input_filters = self.nb_filters
             
             self.conv_blocks.append(ConvBlock(
@@ -83,17 +83,17 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
         
         # Define LSTM layers
         self.lstm_layers = []
-        for i in range(self.nb_layers_lstm):
+        for i in range(self.nb_layers_lstm): # 2
             if i == 0:
                 self.lstm_layers.append(nn.LSTM(
-                    self.input_channels * self.nb_filters, 
-                    self.nb_units_lstm, 
+                    self.input_channels * self.nb_filters,  # 9 * 64 = 576
+                    self.nb_units_lstm, # 128
                     batch_first=True
                 ))
             else:
                 self.lstm_layers.append(nn.LSTM(
-                    self.nb_units_lstm, 
-                    self.nb_units_lstm, 
+                    self.nb_units_lstm, # 128
+                    self.nb_units_lstm, # 128
                     batch_first=True
                 ))
                 
@@ -104,16 +104,16 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
         self.dropout = nn.Dropout(self.drop_prob)
         
         # attention
-        self.linear_1 = nn.Linear(self.nb_units_lstm, self.nb_units_lstm)
+        self.linear_1 = nn.Linear(self.nb_units_lstm, self.nb_units_lstm) # (128 → 128)
         self.tanh = nn.Tanh()
         self.dropout_2 = nn.Dropout(0.2)
-        self.linear_2 = nn.Linear(self.nb_units_lstm, 1, bias=False)
+        self.linear_2 = nn.Linear(self.nb_units_lstm, 1, bias=False) # (128 → 1)
         
         # 각 ECDF 특성에 대한 독립적인 FC 레이어 생성
         self.feature_predictors = nn.ModuleList()
         for i in range(self.feat_per_axis):
             # 간단한 단일 FC 레이어로 각 특성에 대한 예측
-            fc = nn.Linear(self.nb_units_lstm, self.axis_dim)
+            fc = nn.Linear(self.nb_units_lstm, self.axis_dim) # (128 → 3)
             self.feature_predictors.append(fc)
         
         # Store output size of feature extractor for get_embedding_dim
@@ -133,34 +133,37 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
         Extract feature embeddings without applying regression head
         
         Args:
-            x: Input tensor [batch_size, window_size, input_channels]
+            x: Input tensor [batch_size, window_size, input_channels] (128, 168, 9)
             return_sequences: If True, returns full LSTM sequence output,
                             otherwise returns last hidden state (default: False)
             
         Returns:
-            If return_sequences=True: LSTM outputs [batch_size, seq_len, nb_units_lstm]
-            If return_sequences=False: Last hidden state [batch_size, nb_units_lstm]
+            If return_sequences=True: LSTM outputs [batch_size, seq_len, nb_units_lstm] (128, 168, 128)
+            If return_sequences=False: Last hidden state [batch_size, nb_units_lstm] (128, 128)
         """
         batch_size = x.size(0)
         
-        # Reshape input for 2D convolution: [batch_size, 1, window_size, input_channels]
+        # Reshape input for 2D convolution: [batch_size, 1, window_size, input_channels] 
+        #  (128, 168, 9) -> (128, 1, 168, 9)
         x = x.unsqueeze(1)
         
         # Apply convolutional blocks
+        # (128, 1, 168, 9) -> (128, 64, 80, 9) -> (128, 64, 36, 9)
         for conv_block in self.conv_blocks:
             x = conv_block(x)
         
         # Get final sequence length
-        final_seq_len = x.shape[2]
+        final_seq_len = x.shape[2] # 36
         
         # Reshape for LSTM: [batch, seq_len, features]
-        x = x.permute(0, 2, 1, 3)
-        x = x.reshape(batch_size, final_seq_len, self.nb_filters * self.input_channels)
+        x = x.permute(0, 2, 1, 3) # (128, 64, 36, 9) -> (128, 36, 64, 9)
+        x = x.reshape(batch_size, final_seq_len, self.nb_filters * self.input_channels) # (128, 36, 64*9=576)
         
         # Apply dropout
         x = self.dropout(x)
         
         # Apply LSTM layers
+        # (128, 36, 576) → (128, 36, 128) → (128, 36, 128)
         for i, lstm_layer in enumerate(self.lstm_layers):
             if i < len(self.lstm_layers) - 1:
                 # For intermediate layers, use the full sequence
@@ -171,20 +174,21 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
         
         if return_sequences:
             # Return full sequence output
-            return lstm_out
+            return lstm_out # [B, T, H] (128, 36, 128)
         else:
             # attention - shape: [batch_size, sequence_length, hidden_dim]
-            context = lstm_out[:, :-1, :]  
-            out = lstm_out[:, -1, :]       
+            context = lstm_out[:, :-1, :]  # [B, T-1, H] (128, 35, 128)
+            out = lstm_out[:, -1, :]       # [B, H] (128, 128)
             
-            uit = self.linear_1(context)
-            uit = self.tanh(uit)
-            uit = self.dropout_2(uit)
-            ait = self.linear_2(uit)
+            uit = self.linear_1(context) # [B, T-1, H] (128, 35, 128)
+            uit = self.tanh(uit) # (128, 35, 128)
+            uit = self.dropout_2(uit) # (128, 35, 128)
+            ait = self.linear_2(uit) # [B, T-1, 1] (128, 35, 1)
             attn = torch.matmul(F.softmax(ait, dim=1).transpose(-1, -2), context).squeeze(-2)
             
-            # 어텐션이 적용된 feature를 반환
-            return out + attn
+            # out: 마지막 타임스텝의 정보
+            # attn: 중요한 시간 정보만 요약한 벡터
+            return out + attn # [B, H]
     
     def forward(self, x, return_sequences=False):
         """
@@ -200,7 +204,8 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
             If return_sequences=False: ECDF features [batch_size, 3, 78]
         """
         # Get embeddings - either sequence or last hidden state
-        features = self.get_embedding(x, return_sequences)
+        # x (128, 168, 9)
+        features = self.get_embedding(x, return_sequences) # (128, 128)
         
         if return_sequences:
             # For classification: return full sequence output
@@ -210,11 +215,11 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
             outputs = []
             for i in range(self.feat_per_axis):
                 fc = self.feature_predictors[i]
-                x_feature = fc(features)
+                x_feature = fc(features) # (128, 3)
                 outputs.append(x_feature)
             
             # 모든 출력을 결합하여 [batch_size, 3, 78] 형태로 생성
-            x = torch.stack(outputs, dim=2)  # [batch_size, 3, 78]
+            x = torch.stack(outputs, dim=2)  # [batch_size, 3, 78] (128, 3, 78)
             
             return x
     

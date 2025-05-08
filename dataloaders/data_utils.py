@@ -10,7 +10,7 @@ def compute_ecdf_features(window_data: Union[np.ndarray, torch.Tensor], n_points
     Feature extraction based on ECDF (Empirical Cumulative Distribution Function)
     
     Args:
-        window_data: Input time series data [window_size, channels] 
+        window_data: Input time series data [window_size, channels]  (168, 9)
         n_points: Number of points to extract from each time series (default: 25)
     
     Returns:
@@ -37,7 +37,7 @@ def compute_ecdf_features(window_data: Union[np.ndarray, torch.Tensor], n_points
     # y축: 1, 4, 7번 채널 (hand, chest, ankle의 y축)
     # z축: 2, 5, 8번 채널 (hand, chest, ankle의 z축)
     axes_indices = [
-        [0, 3, 6],  # x축 (hand_x, chest_x, ankle_x)
+        [0, 3, 6],  # x축 (hand_x, chest_x, ankle_x) # axis_channels
         [1, 4, 7],  # y축 (hand_y, chest_y, ankle_y)
         [2, 5, 8]   # z축 (hand_z, chest_z, ankle_z)
     ]
@@ -57,12 +57,12 @@ def compute_ecdf_features(window_data: Union[np.ndarray, torch.Tensor], n_points
             sorted_data = np.sort(channel_data)
             
             # Select n_points points at equal intervals
-            indices = np.around(np.linspace(0, len(sorted_data) - 1, num=n_points)).astype(int)
+            indices = np.around(np.linspace(0, len(sorted_data) - 1, num=n_points)).astype(int)  # (25,)
             ecdf_points = sorted_data[indices]
             
             # Store features for this channel: n_points ECDF points + 1 mean value
             # 각 축(axis_idx)의 i번째 센서에 대한 시작 인덱스 계산
-            start_idx = i * (n_points + 1)
+            start_idx = i * (n_points + 1) # 0, 26, 52
             ecdf_features[axis_idx, start_idx:start_idx + n_points] = ecdf_points
             ecdf_features[axis_idx, start_idx + n_points] = mean_value
             
@@ -84,14 +84,14 @@ def compute_batch_ecdf_features(batch_data: Union[np.ndarray, torch.Tensor]) -> 
     if isinstance(batch_data, torch.Tensor):
         batch_data = batch_data.detach().cpu().numpy()
         
-    batch_size = batch_data.shape[0]
+    batch_size = batch_data.shape[0] # 128
     features = np.zeros((batch_size, 3, 78))  # [batch_size, 3 axes, (n_points+1)*3] = [batch_size, 3, 78]
     
-    
+    # 128개의 데이터에 대해 각각 ECDF 특성 계산
     for i in range(batch_size):
-        features[i] = compute_ecdf_features(batch_data[i]) # (3, 78)
+        features[i] = compute_ecdf_features(batch_data[i]) # (168, 9) → (3, 78)
     
-    return features
+    return features # (128, 3, 78)
 
 def get_ecdf_dimension() -> tuple:
     """

@@ -37,17 +37,18 @@ class DeepConvLSTMAttnClassifier(nn.Module):
         out = lstm_sequence[:, -1, :]      # Output of last timestep
         
         # Calculate attention weights
-        uit = self.linear_1(context)
-        uit = self.tanh(uit)
-        uit = self.dropout_2(uit)
-        ait = self.linear_2(uit)
+        uit = self.linear_1(context) # (128, 35, 128)
+        uit = self.tanh(uit) 
+        uit = self.dropout_2(uit) 
+        ait = self.linear_2(uit) # (128, 35, 1)
         
         # Apply attention
-        attn_weights = F.softmax(ait, dim=1).transpose(-1, -2)
-        attn = torch.matmul(attn_weights, context).squeeze(-2)
+        attn_weights = F.softmax(ait, dim=1).transpose(-1, -2) # (128, 1, 35)
+        # (128, 1, 35) × (128, 35, 128) → (128, 1, 128) → (128, 128)
+        attn = torch.matmul(attn_weights, context).squeeze(-2) 
         
         # Combine attention output with last hidden state
-        combined = out + attn
+        combined = out + attn # (128, 128)
         
         # Class prediction
         output = self.fc(combined)

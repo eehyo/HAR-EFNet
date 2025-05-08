@@ -131,9 +131,11 @@ class DeepConvLSTMEncoder(EncoderBase):
         batch_size = x.size(0)
         
         # Reshape input for 2D convolution: [batch_size, 1, window_size, input_channels]
+        # (128, 168, 9) -> (128, 1, 168, 9)
         x = x.unsqueeze(1)
         
         # Apply convolutional blocks
+        # (128, 1, 168, 9) -> (128, 64, 80, 9) -> (128, 64, 36, 9)
         for conv_block in self.conv_blocks:
             x = conv_block(x)
         # [batch_size, nb_filters, reduced_length, input_channels]
@@ -142,8 +144,8 @@ class DeepConvLSTMEncoder(EncoderBase):
         final_seq_len = x.shape[2]
         
         # Reshape for LSTM: [batch_size, final_seq_len, nb_filters * input_channels]
-        x = x.permute(0, 2, 1, 3) # (B, L, nb_filters, C)
-        # [batch_size, reduced_length, nb_filters*input_channels]
+        # (128, 64, 36, 9) -> (128, 36, 64, 9)
+        x = x.permute(0, 2, 1, 3) 
         x = x.reshape(batch_size, final_seq_len, self.nb_filters * self.input_channels)
         
         # Apply dropout
@@ -154,6 +156,7 @@ class DeepConvLSTMEncoder(EncoderBase):
             x, _ = lstm_layer(x)
         
         # Get last LSTM output
+        # (128, 36, 128) -> (128, 128)
         x = x[:, -1, :]
         
         return x

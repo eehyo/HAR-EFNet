@@ -90,6 +90,7 @@ class ClassifierTrainer:
             batch_y = batch_y.long().to(self.device)
             
             # Model forward pass
+            # (128, 168, 9) -> (128, 12)
             outputs = self.model(batch_x)
             
             # Calculate loss
@@ -300,9 +301,9 @@ def evaluate_classifier(args: Any, model: nn.Module, test_loader: DataLoader,
             batch_y = batch_y.long().to(device)
             
             # Model forward pass and predictions
-            outputs = model(batch_x)
-            pred = outputs.argmax(dim=1).cpu().numpy()
-            true = batch_y.cpu().numpy()
+            outputs = model(batch_x) # (128, 12)
+            pred = outputs.argmax(dim=1).cpu().numpy() # (128,)
+            true = batch_y.cpu().numpy() # (128,)
             
             predictions.extend(pred)
             true_labels.extend(true)

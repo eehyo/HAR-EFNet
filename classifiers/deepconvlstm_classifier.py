@@ -18,13 +18,13 @@ class DeepConvLSTMClassifier(nn.Module):
         
     def forward(self, x):
         # extract features from encoder
-        features = self.encoder.get_embedding(x)
+        features = self.encoder.get_embedding(x) # (128, 128)
         
         # apply dropout
-        features = self.dropout(features)
+        features = self.dropout(features) # (128, 128)
         
         # linear classifier for class prediction
-        output = self.fc(features)
+        output = self.fc(features) # (128, 12)
         
         return output
     

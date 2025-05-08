@@ -72,6 +72,10 @@ class Logger:
         console_handler.setFormatter(formatter)
         root_logger.addHandler(console_handler)
         
+        # Set matplotlib logger level to WARNING to suppress DEBUG messages
+        matplotlib_logger = logging.getLogger('matplotlib')
+        matplotlib_logger.setLevel(logging.WARNING)
+        
         root_logger.info(f"===== New Session Started: {cls._run_id} =====")
         
         # Mark as initialized
