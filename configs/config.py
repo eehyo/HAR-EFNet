@@ -65,19 +65,19 @@ def get_args():
     args.datanorm_type = "standardization"
     
     # training settings
-    args.train_epochs = 1
+    args.train_epochs = 300
     args.learning_rate = 0.0005
     args.learning_rate_patience = 7
     args.learning_rate_factor = 0.1
     args.early_stop_patience = 20
-    args.batch_size = 128
+    args.batch_size = 256
     args.shuffle = True
     args.drop_last = False
     args.train_vali_quote = 0.90
 
-    args.classifier_lr = 0.001
-    args.classifier_epochs = 1
-    args.classifier_batch_size = 128
+    args.classifier_lr = 0.0001
+    args.classifier_epochs = 300
+    args.classifier_batch_size = 256
     args.freeze_encoder = True  # Freeze
     
     # Time series input settings
@@ -94,7 +94,7 @@ def get_args():
     
     # Random seed and other settings
     args.sensor_select = ["acc"]
-    args.seed = 42
+    args.seed = 10
     args.filtering = True
     args.freq1 = 0.001
     args.freq2 = 25.0

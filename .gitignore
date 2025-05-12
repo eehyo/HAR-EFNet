@@ -55,6 +55,7 @@ archive/
 
 # 모델 파일
 saved/
+architecture/
 *.pth
 *.pt
 *.ckpt

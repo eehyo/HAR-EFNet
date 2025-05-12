@@ -1,15 +1,4 @@
 efnet_encoder:
-  # cnn:
-  #   kernel_size: 5
-  #   conv_channels: [64, 128, 256]
-  #   dropout_rate: 0.3
-  
-  # lstm:
-  #   hidden_size: 128
-  #   num_layers: 2
-  #   bidirectional: True
-  #   dropout_rate: 0.3
-
   deepconvlstm:
     nb_conv_blocks: 2
     nb_filters: 64
@@ -18,7 +7,7 @@ efnet_encoder:
     nb_layers_lstm: 2
     drop_prob: 0.5
     nb_units_lstm: 128
-    # dilation: 1
+    dilation: 1
   
   # CNN + LSTM
   deepconvlstm_attn:
@@ -34,13 +23,10 @@ efnet_encoder:
   sa_har:
     nb_units: 128
     n_heads: 4
-    dropout_rate: 0.1
+    dropout_rate: 0.2
     batch_norm: False
 
 efnet_classifier:
-  # mlp:
-  #   classifier_hidden: [256, 128]  
-  #   dropout_rate: 0.5
     
   deepconvlstm_classifier:
     dropout_rate: 0.5

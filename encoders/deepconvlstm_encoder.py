@@ -50,7 +50,7 @@ class DeepConvLSTMEncoder(EncoderBase):
         self.dilation = config.get('dilation', 1)
         self.batch_norm = config.get('batch_norm', True)
         self.filter_width = config.get('filter_width', 5)
-        self.nb_layers_lstm = config.get('nb_layers_lstm', 1)
+        self.nb_layers_lstm = config.get('nb_layers_lstm', 2)
         self.drop_prob = config.get('drop_prob', 0.5)
         self.nb_units_lstm = config.get('nb_units_lstm', 128)
         

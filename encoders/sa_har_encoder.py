@@ -38,22 +38,23 @@ class EncoderLayer(nn.Module):
         self.dropout1 = nn.Dropout(p=dropout)
         self.layernorm1 = nn.LayerNorm(normalized_shape=d_model, eps=1e-6)    
         
-        d_ff = d_ff or 4*d_model
+        d_ff = d_ff or 4*d_model  # 4*128 = 512
         self.ffn1 = nn.Linear(d_model, d_ff, bias=True)
-        self.relu = nn.LeakyReLU(negative_slope=0.01)
+        self.relu = nn.ReLU()
         self.ffn2 = nn.Linear(d_ff, d_model, bias=True)
          
         self.layernorm2 = nn.LayerNorm(normalized_shape=d_model, eps=1e-6)               
         self.dropout2 = nn.Dropout(p=dropout)
 
     def forward(self, x):
-        attn_output, attn = self.attention(x, x, x)
+        attn_output, attn = self.attention(x, x, x) # [B, 168, 128]
         attn_output = self.dropout1(attn_output)
-        out1 = self.layernorm1(x + attn_output)
+        out1 = self.layernorm1(x + attn_output) # [B, 168, 128]
         # Shape: (B, L, C); C = nb_units = d_model
         
+        # (B, L, d_model) -> (B, L, d_ff) -> (B, L, d_model)
+        # [B, 168, 128] -> [B, 168, 512] -> [B, 168, 128]
         ffn_output = self.ffn2(self.relu(self.ffn1(out1)))
-        # Shape: (B, L, d_ff) -> (B, L, d_model)
         ffn_output = self.dropout2(ffn_output)
         out2 = self.layernorm2(out1 + ffn_output)
         
@@ -68,7 +69,7 @@ class AttentionWithContext(nn.Module):
         if act_fn == "tanh":
             self.activation = nn.Tanh() 
         elif act_fn == "leaky_relu":
-            self.activation = nn.LeakyReLU(negative_slope=0.01)
+            self.activation = nn.LeakyReLU()
         else:
             raise NotImplementedError
         
@@ -104,8 +105,7 @@ class ConvBlock(nn.Module):
 
         self.conv1 = nn.Conv2d(self.input_filters, self.nb_units, (self.filter_width, 1), 
                               dilation=(self.dilation, 1), padding='same')
-        # self.relu = nn.ReLU()
-        self.relu = nn.LeakyReLU(negative_slope=0.01, inplace=True)
+        self.relu = nn.ReLU()
         self.conv2 = nn.Conv2d(self.nb_units, 1, (self.filter_width, 1), 
                               dilation=(self.dilation, 1), stride=(1,1), padding='same')
         if self.batch_norm:
@@ -135,8 +135,7 @@ class SensorAttention(nn.Module):
                                dilation=2, padding='same')
         self.conv_f = nn.Conv2d(in_channels=nb_units, out_channels=1, kernel_size=1, 
                                padding='same')
-        # self.relu = nn.ReLU()
-        self.relu = nn.LeakyReLU(negative_slope=0.01)
+        self.relu = nn.ReLU()
 
         self.softmax = nn.Softmax(dim=3)
 
@@ -145,17 +144,17 @@ class SensorAttention(nn.Module):
         input: [batch * length * channel]
         output: [batch, length, d]
         '''
-        inputs = self.ln(inputs)               
+        inputs = self.ln(inputs)       # [B, 168, 9]    
         x = inputs.unsqueeze(1)                
-        # [batch, 1, length, channel]
+        # [batch, 1, length, channel] = [B, 1, 168, 9]
         x = self.conv_1(x)              
         x = self.relu(x)  
-        # [batch, nb_units, length, channel]
+        # [batch, nb_units, length, channel] = [B, 128, 168, 9]
         x = self.conv_f(x)               
-        # [batch, 1, length, channel]
+        # [batch, 1, length, channel] = [B, 1, 168, 9]
         x = self.softmax(x)
         x = x.squeeze(1)
-        # [batch, length, channel]
+        # [batch, length, channel] = [B, 168, 9]
         return torch.mul(inputs, x), x
 
 
@@ -168,7 +167,7 @@ class SAHAREncoder(EncoderBase):
         super(SAHAREncoder, self).__init__(config)
         
         # Model specific parameters
-        self.nb_units = config.get('nb_units', 64)
+        self.nb_units = config.get('nb_units', 128)
         self.n_heads = config.get('n_heads', 4)
         self.dropout_rate = config.get('dropout_rate', 0.2)
         self.batch_norm = config.get('batch_norm', True)
@@ -204,7 +203,8 @@ class SAHAREncoder(EncoderBase):
         )
         
         # 활성화 함수와 드롭아웃 정의
-        self.relu = nn.LeakyReLU(negative_slope=0.01)
+        self.relu = nn.ReLU()
+        self.leaky_relu = nn.LeakyReLU(negative_slope=0.01)  # feature_predictors
         self.dropout = nn.Dropout(p=self.dropout_rate)
         
         # Transformer encoder layers
@@ -223,8 +223,7 @@ class SAHAREncoder(EncoderBase):
         )
         
         # Global temporal attention
-        self.attention_with_context = AttentionWithContext(self.nb_units,
-                                                           act_fn="leaky_relu")
+        self.attention_with_context = AttentionWithContext(self.nb_units)
         
         # 각 ECDF 특성에 대한 독립적인 FC 레이어 체인 생성 (기존 FC 구조 유지)
         self.feature_predictors = nn.ModuleList()
@@ -293,20 +292,19 @@ class SAHAREncoder(EncoderBase):
             ECDF features [batch_size, 3, 78]
         """
         # Get embeddings from feature extractor
-        features = self.get_embedding(x)
+        features = self.get_embedding(x) # [B, 128]
         
         # 각 특성별로 독립적인 FC 레이어 체인 적용
         outputs = []
         for i in range(self.feat_per_axis):
             fc1, fc_out = self.feature_predictors[i]
-            x_feature = fc1(features)
-            x_feature = self.relu(x_feature)
+            x_feature = fc1(features) # [B, 128] -> [B, 12]
+            x_feature = self.leaky_relu(x_feature)  # LeakyReLU
             x_feature = self.dropout(x_feature)
-            x_feature = fc_out(x_feature)
+            x_feature = fc_out(x_feature) # [B, 12] -> [B, 3]
             outputs.append(x_feature)
         
-        # 모든 출력을 결합하여 [batch_size, 3, 78] 형태로 생성
-        x = torch.stack(outputs, dim=2)  # [batch_size, 3, 78]
+        x = torch.stack(outputs, dim=2)  # [B, 3, 78]
         
         return x
     
