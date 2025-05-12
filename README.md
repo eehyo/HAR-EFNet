@@ -1,14 +1,19 @@
 # HAR-EFNet: Human Activity Recognition with ECDF Feature Network
 
-## Introduction
-
 This project implements a Human Activity Recognition (HAR) system using ECDF-based feature prediction for representation learning. The system is designed to recognize 12 distinct human activities from IMU sensor data using a two-stage training pipeline:
 
-1.	Encoder Training (Supervised Regression)
-A neural encoder is trained to predict 234-dimensional ECDF (Empirical Cumulative Distribution Function) features from raw IMU signals using MSE loss.
+**1. Encoder Training (Supervised Regression)**
+   
+A neural encoder is trained to predict ECDF (Empirical Cumulative Distribution Function) features derived from raw 9-channel IMU time-series data.
+The model learns to regress a structured [3×78] feature vector (78 features per axis) using MSE loss.
 
-2.	Activity Classification
-After training, the encoder is used as a fixed feature extractor. A separate classifier is then trained on top of the predicted ECDF features to recognize 12 distinct human activities.
+**2. Activity Classification**
+   
+After training, the encoder is frozen and used as a feature extractor. A lightweight classifier is then trained on top of the predicted ECDF features to perform multi-class classification across 12 activity classes.
+
+
+---
+
 
 ## Project Structure
 ```
@@ -52,27 +57,21 @@ HAR-EFNet/
     └── results/
 ```
 
-### The dependencies can be installed by:
+---
+
+
+## Installation
+Install the dependencies using Poetry:
 ```bash
 poetry install
 ```
-
-### 1. Train Encoder
+## Usage
+### 1. End-to-End Training - All Subjects
 ```bash
-python main.py -d pamap2 -e cnn --train_encoder True --train_classifier False --test False
+python main.py --train_encoder True --train_classifier True --test True
 ```
 
-### 2. Train Classifier with Pre-trained Encoder
+### 2. End-to-End Training - Specific Subject
 ```bash
-python main.py -d pamap2 -e cnn --train_encoder False --train_classifier True --test False --load_encoder True --encoder_path /path/to/encoder.pth
-```
-
-### 3. End-to-End Training and Testing (all subjects)
-```bash
-python main.py -d pamap2 -e cnn --train_encoder True --train_classifier True --test True
-```
-
-### 4. End-to-End for Specific Subject
-```bash
-python main.py -d pamap2 -e cnn --train_encoder True --train_classifier True --test True --specific_subject 5
+python main.py --train_encoder True --train_classifier True --test True --specific_subject 1
 ``` 
