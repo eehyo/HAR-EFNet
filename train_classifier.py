@@ -63,8 +63,8 @@ class ClassifierTrainer:
         # Early stopping and learning rate adjustment
         self.early_stopping = EarlyStopping(patience=args.early_stop_patience, verbose=True,
                                           logger_name=f"es_classifier_{args.encoder_type}_{args.classifier_type}")
-        self.learning_rate_adapter = adjust_learning_rate(args, verbose=True,
-                                                      logger_name=f"lr_classifier_{args.encoder_type}_{args.classifier_type}")
+        # self.learning_rate_adapter = adjust_learning_rate(args, verbose=True,
+        #                                               logger_name=f"lr_classifier_{args.encoder_type}_{args.classifier_type}")
     
     def train_epoch(self, train_loader: DataLoader) -> Tuple[float, float]:
         """
@@ -195,13 +195,13 @@ class ClassifierTrainer:
             self.logger.info(log_message)
             
             # Early stopping check
-            self.early_stopping(valid_loss, self.model, self.save_path, f_macro, None)
+            self.early_stopping(valid_loss, self.model, self.save_path, f_macro)
             if self.early_stopping.early_stop:
                 self.logger.info("Early stopping triggered")
                 break
             
             # Learning rate adjustment
-            self.learning_rate_adapter(self.optimizer, valid_loss)
+            # self.learning_rate_adapter(self.optimizer, valid_loss)
         
         # Training complete
         self.logger.info("Classifier training completed")

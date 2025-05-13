@@ -56,8 +56,8 @@ class EncoderTrainer:
         # Early stopping and learning rate adjustment
         self.early_stopping = EarlyStopping(patience=args.early_stop_patience, verbose=True, 
                                           logger_name=f"es_encoder_{args.encoder_type}")
-        self.learning_rate_adapter = adjust_learning_rate(args, verbose=True, 
-                                                      logger_name=f"lr_encoder_{args.encoder_type}")
+        # self.learning_rate_adapter = adjust_learning_rate(args, verbose=True, 
+        #                                               logger_name=f"lr_encoder_{args.encoder_type}")
     
     def train_epoch(self, train_loader: DataLoader) -> Tuple[float, float]:
         """
@@ -181,7 +181,7 @@ class EncoderTrainer:
                 break
             
             # Learning rate adjustment
-            self.learning_rate_adapter(self.optimizer, valid_loss)
+            # self.learning_rate_adapter(self.optimizer, valid_loss)
         
         # Training complete
         self.logger.info("Encoder training completed")

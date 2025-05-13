@@ -43,6 +43,7 @@ class EarlyStopping:
         self.best_score = None
         self.early_stop = False
         self.val_loss_min = np.inf
+        self.metric_max = -np.inf 
         self.delta = delta
         self.logger = Logger(logger_name)
         
@@ -57,7 +58,11 @@ class EarlyStopping:
             metric: Additional metric (optional)
             log: Log file (optional, deprecated)
         """
-        score = -val_loss
+        # For classifier training, use f1_macro (metric) if provided
+        if metric is not None:
+            score = metric 
+        else:
+            score = -val_loss 
         
         if self.best_score is None:
             self.best_score = score
@@ -87,7 +92,10 @@ class EarlyStopping:
             metric: Additional metric (optional)
         """
         if self.verbose:
-            self.logger.info(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}). Saving model...')
+            if metric is not None:
+                self.logger.info(f'F1 Macro Score increased ({self.metric_max:.6f} --> {metric:.6f}). Saving model...')
+            else:
+                self.logger.info(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}). Saving model...')
         
         # path check
         if not os.path.exists(save_path):
@@ -106,6 +114,7 @@ class EarlyStopping:
         
         if metric is not None:
             checkpoint['metric'] = metric
+            self.metric_max = metric  
             
         torch.save(checkpoint, model_path)
         self.val_loss_min = val_loss
