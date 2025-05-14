@@ -8,7 +8,7 @@ from dataloaders.data_loader import PAMAP2, get_data
 from utils.training_utils import set_seed, save_results_summary
 from utils.logger import Logger
 
-from train_encoder_mtl import create_mtl_encoder, load_pretrained_mtl_encoder, SelfSupMTLTrainer, get_transform_functions
+from train_encoder_mtl import create_mtl_encoder, load_pretrained_mtl_encoder, MTLEncoderTrainer, get_transform_functions
 from train_classifier import create_classifier, ClassifierTrainer, evaluate_classifier
 
 if __name__ == '__main__': 
@@ -32,7 +32,7 @@ if __name__ == '__main__':
     dataset = PAMAP2(args)
     logger.info(f"Dataset: {args.data_name} loaded")
 
-    # For test performance aggregation (when args.test==True)
+    # for test performance aggregation (if args.test==True)
     results = {
         'subject_id': [],
         'accuracy': [],
@@ -63,7 +63,7 @@ if __name__ == '__main__':
         
         logger.info(f"Fold {fold_idx+1}/{len(dataset.LOCV_keys)}: Testing on Subject {current_test_subject}, Training on Subjects {dataset.train_keys}")
 
-        # Create data loaders - use classifier batch size when training classifier
+        # Create data loaders - use classifier batch size if training classifier
         batch_size = args.classifier_batch_size if args.train_classifier else args.batch_size
         train_loader = get_data(dataset, batch_size, flag="train")
         valid_loader = get_data(dataset, batch_size, flag="valid") 
@@ -77,7 +77,6 @@ if __name__ == '__main__':
         run_id = Logger.get_run_id()
         
         # Directory timestamp format should match folder structure
-        # Add 'mtl_' prefix to indicate MTL model
         encoder_save_path = os.path.join(args.encoder_save_path, f"mtl_{args.encoder_type}_{timestamp}", fold_dir)
         classifier_save_path = os.path.join(args.classifier_save_path, f"mtl_{args.encoder_type}_{args.classifier_type}_{timestamp}", fold_dir)
         
@@ -91,7 +90,7 @@ if __name__ == '__main__':
             f.write(f"Test Subject: {current_test_subject}\n")
             f.write(f"Train Subjects: {dataset.train_keys}\n")
             f.write(f"Data Split: train={len(train_loader.dataset)}, valid={len(valid_loader.dataset)}, test={len(test_loader.dataset)} samples\n")
-            f.write(f"Encoder Type: MTL_{args.encoder_type}\n")
+            f.write(f"Encoder Type: {args.encoder_type}\n")
             f.write(f"Classifier Type: {args.classifier_type}\n")
             f.write(f"Timestamp: {timestamp}\n")
             f.write(f"Run ID: {run_id}\n")
@@ -107,7 +106,7 @@ if __name__ == '__main__':
             transform_funcs = get_transform_functions()
             
             # Create and train MTL Trainer
-            mtl_encoder_trainer = SelfSupMTLTrainer(args, mtl_encoder, transform_funcs, encoder_save_path)
+            mtl_encoder_trainer = MTLEncoderTrainer(args, mtl_encoder, transform_funcs, encoder_save_path)
             mtl_encoder = mtl_encoder_trainer.train(train_loader, valid_loader)
             
             logger.info(f"MTL encoder training completed for fold {fold_idx+1}")
@@ -129,13 +128,6 @@ if __name__ == '__main__':
             
             logger.info(f"Loading MTL encoder from: {encoder_checkpoint_path}")
             mtl_encoder = load_pretrained_mtl_encoder(mtl_encoder, encoder_checkpoint_path)
-            
-            # Configure whether to freeze encoder parameters
-            if args.freeze_encoder:
-                logger.info("Freezing MTL encoder parameters during classifier training")
-                for param in mtl_encoder.parameters():
-                    param.requires_grad = False
-            
             # Extract base encoder from encoder model (accessed through .encoder attribute in MTL)
             base_encoder = mtl_encoder.encoder
             
@@ -150,40 +142,41 @@ if __name__ == '__main__':
         if args.test:
             logger.info(f"Testing on subject {current_test_subject} (fold {fold_idx+1})")
             
-            # Load models
-            mtl_encoder = create_mtl_encoder(args)
-            
-            if args.load_encoder:
-                encoder_checkpoint_path = args.encoder_path
-            else:
-                encoder_model_name = f"best_model_{run_id}.pth"
-                encoder_checkpoint_path = os.path.join(encoder_save_path, encoder_model_name)
-            
-            logger.info(f"Loading MTL encoder from: {encoder_checkpoint_path}")
-            mtl_encoder = load_pretrained_mtl_encoder(mtl_encoder, encoder_checkpoint_path)
-            
-            # Extract base encoder (accessed through .encoder attribute in MTL)
-            base_encoder = mtl_encoder.encoder
-            
-            # Create classifier
-            classifier = create_classifier(args, base_encoder)
-            
-            # Load classifier checkpoint
-            if args.load_classifier and args.classifier_path:
-                classifier_checkpoint_path = args.classifier_path
-            else:
-                classifier_model_name = f"best_model_{run_id}.pth"
-                classifier_checkpoint_path = os.path.join(classifier_save_path, classifier_model_name)
-            
-            logger.info(f"Loading classifier from: {classifier_checkpoint_path}")
-            checkpoint = torch.load(classifier_checkpoint_path, map_location=args.device, weights_only=False)
-            classifier.load_state_dict(checkpoint['model_state_dict'])
-            
-            # Set current test subject and fold index for result tracking
-            args.test_subject = current_test_subject
+            # Set args values needed for evaluation
             args.fold_idx = fold_idx + 1
+            args.test_subject = current_test_subject
             
-            # Evaluate on test set (left-out subject)
+            # Load models
+            if not args.train_classifier:
+                # Create and load MTL encoder
+                mtl_encoder = create_mtl_encoder(args)
+                if args.load_encoder:
+                    encoder_checkpoint_path = args.encoder_path
+                else:
+                    encoder_model_name = f"best_model_{run_id}.pth"
+                    encoder_checkpoint_path = os.path.join(encoder_save_path, encoder_model_name)
+                
+                logger.info(f"Loading MTL encoder from: {encoder_checkpoint_path}")
+                mtl_encoder = load_pretrained_mtl_encoder(mtl_encoder, encoder_checkpoint_path)
+                
+                # Extract base encoder
+                base_encoder = mtl_encoder.encoder
+                
+                # Create classifier
+                classifier = create_classifier(args, base_encoder)
+                
+                # Load classifier checkpoint
+                if args.load_classifier and args.classifier_path:
+                    classifier_checkpoint_path = args.classifier_path
+                else:
+                    classifier_model_name = f"best_model_{run_id}.pth"
+                    classifier_checkpoint_path = os.path.join(classifier_save_path, classifier_model_name)
+                
+                logger.info(f"Loading classifier from: {classifier_checkpoint_path}")
+                checkpoint = torch.load(classifier_checkpoint_path, map_location=args.device, weights_only=False)
+                classifier.load_state_dict(checkpoint['model_state_dict'])
+            
+            # Evaluate on test set
             acc, f_w, f_macro, f_micro = evaluate_classifier(args, classifier, test_loader, classifier_save_path)
             
             results['subject_id'].append(current_test_subject)

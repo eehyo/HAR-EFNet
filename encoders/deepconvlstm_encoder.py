@@ -118,6 +118,18 @@ class DeepConvLSTMEncoder(EncoderBase):
         """
         return self.embedding_dim
     
+    def extract_features(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Extract features for classification or other downstream tasks
+        
+        Args:
+            x: Input tensor [batch_size, window_size, input_channels]
+            
+        Returns:
+            Feature embedding [batch_size, embedding_dim]
+        """
+        return self.get_embedding(x)
+    
     def get_embedding(self, x):
         """
         Extract feature embeddings without applying regression head
@@ -207,4 +219,19 @@ class DeepConvLSTMEncoder(EncoderBase):
             feature_losses.append(feature_loss)
             total_loss += feature_loss
         
-        return total_loss, feature_losses 
+        return total_loss, feature_losses
+    
+    def freeze_all(self):
+        """
+        Freeze all encoder parameters
+        Useful for transfer learning when you want to use the encoder as a fixed feature extractor
+        """
+        for param in self.parameters():
+            param.requires_grad = False
+    
+    def unfreeze_all(self):
+        """
+        Unfreeze all encoder parameters for full fine-tuning
+        """
+        for param in self.parameters():
+            param.requires_grad = True 

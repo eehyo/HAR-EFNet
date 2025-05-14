@@ -109,10 +109,8 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
         self.dropout_2 = nn.Dropout(0.2)
         self.linear_2 = nn.Linear(self.nb_units_lstm, 1, bias=False) # (128 → 1)
         
-        # 각 ECDF 특성에 대한 독립적인 FC 레이어 생성
         self.feature_predictors = nn.ModuleList()
         for i in range(self.feat_per_axis):
-            # 간단한 단일 FC 레이어로 각 특성에 대한 예측
             fc = nn.Linear(self.nb_units_lstm, self.axis_dim) # (128 → 3)
             self.feature_predictors.append(fc)
         
@@ -128,18 +126,47 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
         """
         return self.embedding_dim
     
-    def get_embedding(self, x, return_sequences=False):
+    def freeze_cnn_lstm_only(self):
+        """
+        Freeze only CNN and LSTM layers while keeping attention layers trainable
+        This allows preserving the pretrained encoder's core structure
+        while adapting the attention mechanism for classification tasks
+        """
+        # Freeze CNN layers
+        for param in self.conv_blocks.parameters():
+            param.requires_grad = False
+            
+        # Freeze LSTM layers
+        for param in self.lstm_layers.parameters():
+            param.requires_grad = False
+            
+        # Keep attention layers trainable
+        self.linear_1.requires_grad_(True)
+        self.linear_2.requires_grad_(True)
+        
+    def freeze_all(self):
+        """
+        Freeze all encoder parameters
+        """
+        for param in self.parameters():
+            param.requires_grad = False
+    
+    def unfreeze_all(self):
+        """
+        Unfreeze all encoder parameters for full fine-tuning
+        """
+        for param in self.parameters():
+            param.requires_grad = True
+    
+    def get_embedding(self, x):
         """
         Extract feature embeddings without applying regression head
         
         Args:
             x: Input tensor [batch_size, window_size, input_channels] (128, 168, 9)
-            return_sequences: If True, returns full LSTM sequence output,
-                            otherwise returns last hidden state (default: False)
             
         Returns:
-            If return_sequences=True: LSTM outputs [batch_size, seq_len, nb_units_lstm] (128, 168, 128)
-            If return_sequences=False: Last hidden state [batch_size, nb_units_lstm] (128, 128)
+            Attention-enhanced feature embedding [batch_size, nb_units_lstm]
         """
         batch_size = x.size(0)
         
@@ -172,56 +199,59 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
                 # For the last layer, we need both the output sequence and the hidden state
                 lstm_out, (h_n, _) = lstm_layer(x)
         
-        if return_sequences:
-            # Return full sequence output
-            return lstm_out # [B, T, H] (128, 36, 128)
-        else:
-            # attention - shape: [batch_size, sequence_length, hidden_dim]
-            context = lstm_out[:, :-1, :]  # [B, T-1, H] (128, 35, 128)
-            out = lstm_out[:, -1, :]       # [B, H] (128, 128)
-            
-            uit = self.linear_1(context) # [B, T-1, H] (128, 35, 128)
-            uit = self.tanh(uit) # (128, 35, 128)
-            uit = self.dropout_2(uit) # (128, 35, 128)
-            ait = self.linear_2(uit) # [B, T-1, 1] (128, 35, 1)
-            attn = torch.matmul(F.softmax(ait, dim=1).transpose(-1, -2), context).squeeze(-2)
-            
-            # out: 마지막 타임스텝의 정보
-            # attn: 중요한 시간 정보만 요약한 벡터
-            return out + attn # [B, H]
+        # Apply attention mechanism
+        # All sequences except last timestep
+        context = lstm_out[:, :-1, :]  # [B, T-1, H] (128, 35, 128)
+        # Output of last timestep
+        out = lstm_out[:, -1, :]       # [B, H] (128, 128)
+        
+        uit = self.linear_1(context) # [B, T-1, H] (128, 35, 128)
+        uit = self.tanh(uit) # (128, 35, 128)
+        uit = self.dropout_2(uit) # (128, 35, 128)
+        ait = self.linear_2(uit) # [B, T-1, 1] (128, 35, 1)
+        attn = torch.matmul(F.softmax(ait, dim=1).transpose(-1, -2), context).squeeze(-2)
+        
+        # out: information from the last timestep
+        # attn: vector summarizing important temporal information
+        return out + attn # [B, H]
     
-    def forward(self, x, return_sequences=False):
+    def extract_features(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass through encoder
+        Extract features for classification or other downstream tasks
+        Returns feature vector with attention mechanism applied
         
         Args:
             x: Input tensor [batch_size, window_size, input_channels]
-            return_sequences: If True, returns full LSTM sequence output (for classification),
-                            otherwise returns ECDF features (default: False)
             
         Returns:
-            If return_sequences=True: LSTM outputs [batch_size, seq_len, nb_units_lstm]
-            If return_sequences=False: ECDF features [batch_size, 3, 78]
+            Attention-enhanced feature vector [batch_size, embedding_dim]
         """
-        # Get embeddings - either sequence or last hidden state
-        # x (128, 168, 9)
-        features = self.get_embedding(x, return_sequences) # (128, 128)
+        return self.get_embedding(x)
+    
+    def forward(self, x):
+        """
+        Forward pass through encoder for ECDF feature prediction
         
-        if return_sequences:
-            # For classification: return full sequence output
-            return features # (128, 128)
-        else:
-            # 각 특성별로 독립적인 FC 레이어 적용
-            outputs = []
-            for i in range(self.feat_per_axis):
-                fc = self.feature_predictors[i]
-                x_feature = fc(features) # (128, 3)
-                outputs.append(x_feature)
+        Args:
+            x: Input tensor [batch_size, window_size, input_channels]
             
-            # 모든 출력을 결합하여 [batch_size, 3, 78] 형태로 생성
-            x = torch.stack(outputs, dim=2)  # [batch_size, 3, 78] (128, 3, 78)
-            
-            return x
+        Returns:
+            ECDF features [batch_size, 3, 78]
+        """
+        # Extract embeddings with attention applied
+        features = self.get_embedding(x)
+        
+        # Use attention-enhanced features to predict ECDF features
+        outputs = []
+        for i in range(self.feat_per_axis):
+            fc = self.feature_predictors[i]
+            x_feature = fc(features)
+            outputs.append(x_feature)
+        
+        # Combine all outputs into shape [batch_size, 3, 78]
+        x = torch.stack(outputs, dim=2) # (128, 3, 78)
+        
+        return x
     
     def calculate_loss(self, predictions: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """

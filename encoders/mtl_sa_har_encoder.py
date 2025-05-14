@@ -24,8 +24,7 @@ class MTLSAHAREncoder(nn.Module):
         # Configure base encoder
         self.encoder = SAHAREncoder(args)
         
-        # SA-HAR often has a fixed output feature dimension of 128, but we take it from config
-        self.hidden_size = args.get('sa_har_hidden_size', 128)
+        self.hidden_size = self.encoder.embedding_dim
         
         # Device configuration
         self.device = args.get('device', 'cpu')
@@ -132,4 +131,30 @@ class MTLSAHAREncoder(nn.Module):
         Returns:
             Encoded feature vector [batch_size, hidden_size]
         """
-        return self.encoder.extract_features(x) 
+        return self.encoder.extract_features(x)
+    
+    def freeze_all(self):
+        """
+        Freeze all encoder parameters including base encoder and MTL heads
+        """
+        # Freeze base encoder
+        for param in self.encoder.parameters():
+            param.requires_grad = False
+        
+        # Freeze MTL heads
+        for head in self.task_heads.values():
+            for param in head.parameters():
+                param.requires_grad = False
+        
+    def unfreeze_all(self):
+        """
+        Unfreeze all encoder parameters for full fine-tuning
+        """
+        # Unfreeze base encoder
+        for param in self.encoder.parameters():
+            param.requires_grad = True
+        
+        # Unfreeze MTL heads
+        for head in self.task_heads.values():
+            for param in head.parameters():
+                param.requires_grad = True 

@@ -18,7 +18,7 @@ class DeepConvLSTMClassifier(nn.Module):
         
     def forward(self, x):
         # extract features from encoder
-        features = self.encoder.get_embedding(x) # (128, 128)
+        features = self.encoder.extract_features(x) # (128, 128)
         
         # apply dropout
         features = self.dropout(features) # (128, 128)
@@ -28,12 +28,27 @@ class DeepConvLSTMClassifier(nn.Module):
         
         return output
     
-    def freeze_encoder(self):
-        """freeze encoder parameters"""
-        for param in self.encoder.parameters():
-            param.requires_grad = False
+    def freeze_encoder(self, freeze_mode='all'):
+        """
+        Freeze encoder parameters using specified mode
+        
+        Args:
+            freeze_mode: Mode to freeze encoder ('all', 'cnn_lstm_only')
+        """
+        if freeze_mode == 'all':
+            self.encoder.freeze_all()
+        elif freeze_mode == 'cnn_lstm_only':
+            # If this encoder supports selective freezing
+            if hasattr(self.encoder, 'freeze_cnn_lstm_only'):
+                self.encoder.freeze_cnn_lstm_only()
+            else:
+                self.encoder.freeze_all()
+        else:
+            raise ValueError(f"Unsupported freeze mode: {freeze_mode}. " 
+                           "Available modes: 'all', 'cnn_lstm_only'")
             
     def unfreeze_encoder(self):
-        """unfreeze encoder parameters"""
-        for param in self.encoder.parameters():
-            param.requires_grad = True 
+        """
+        Unfreeze all encoder parameters for full fine-tuning
+        """
+        self.encoder.unfreeze_all() 

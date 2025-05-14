@@ -18,7 +18,7 @@ from utils.logger import Logger
 # Initialize global logger
 Logger.initialize(log_dir='logs')
 
-class SelfSupMTLTrainer:
+class MTLEncoderTrainer:
     """
     Self-Supervised Multi-Task Learning Trainer class
     Learns binary classification tasks that predict whether various time series transformations (augmentations) were applied
@@ -38,7 +38,7 @@ class SelfSupMTLTrainer:
         self.model.to(self.device)
         
         # Initialize Logger
-        self.logger = Logger(f"ssl_mtl_{args.encoder_type}")
+        self.logger = Logger(f"mtl_{args.encoder_type}")
         self.logger.info(f"Using device: {self.device}")
         
         # Configure transformation functions
@@ -52,10 +52,11 @@ class SelfSupMTLTrainer:
         self.criterion = nn.BCELoss()
         
         # Configure optimizer
+        # L2 regularization 대신 weight decay 사용
         if args.optimizer == "Adam":
-            self.optimizer = optim.Adam(self.model.parameters(), lr=args.learning_rate)
+            self.optimizer = optim.Adam(self.model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
         else:
-            self.optimizer = optim.SGD(self.model.parameters(), lr=args.learning_rate)
+            self.optimizer = optim.SGD(self.model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
         
         # Save path and logging setup
         self.save_path = save_path
@@ -67,7 +68,7 @@ class SelfSupMTLTrainer:
         
         # Early stopping and learning rate adjustment
         self.early_stopping = EarlyStopping(patience=args.early_stop_patience, verbose=True, 
-                                           logger_name=f"es_ssl_mtl_{args.encoder_type}")
+                                           logger_name=f"es_mtl_{args.encoder_type}")
         
     def generate_ssl_batch(self, batch_x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """

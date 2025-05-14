@@ -111,6 +111,8 @@ if __name__ == '__main__':
             
             # random initialization
             encoder = create_encoder(args)
+            
+            # Determine encoder checkpoint path
             if args.load_encoder:
                 encoder_checkpoint_path = args.encoder_path
             else:
@@ -119,12 +121,6 @@ if __name__ == '__main__':
             
             logger.info(f"Loading encoder from: {encoder_checkpoint_path}")
             encoder = load_pretrained_encoder(encoder, encoder_checkpoint_path)
-            
-            # Configure whether to freeze encoder parameters
-            if args.freeze_encoder:
-                logger.info("Freezing encoder parameters during classifier training")
-                for param in encoder.parameters():
-                    param.requires_grad = False
             
             # Create and train classifier
             classifier = create_classifier(args, encoder)
@@ -137,35 +133,38 @@ if __name__ == '__main__':
         if args.test:
             logger.info(f"Testing on subject {current_test_subject} (fold {fold_idx+1})")
             
-            # Load models
-            encoder = create_encoder(args)
-            if args.load_encoder:
-                encoder_checkpoint_path = args.encoder_path
-            else:
-                encoder_model_name = f"best_model_{run_id}.pth"
-                encoder_checkpoint_path = os.path.join(encoder_save_path, encoder_model_name)
-            
-            logger.info(f"Loading encoder from: {encoder_checkpoint_path}")
-            encoder = load_pretrained_encoder(encoder, encoder_checkpoint_path)
-            
-            classifier = create_classifier(args, encoder)
-            
-            # Load classifier checkpoint
-            if args.load_classifier and args.classifier_path:
-                classifier_checkpoint_path = args.classifier_path
-            else:
-                classifier_model_name = f"best_model_{run_id}.pth"
-                classifier_checkpoint_path = os.path.join(classifier_save_path, classifier_model_name)
-            
-            logger.info(f"Loading classifier from: {classifier_checkpoint_path}")
-            checkpoint = torch.load(classifier_checkpoint_path, map_location=args.device, weights_only=False)
-            classifier.load_state_dict(checkpoint['model_state_dict'])
-            
-            # Set current test subject and fold index for result tracking
-            args.test_subject = current_test_subject
+            # Set args values needed for evaluation
             args.fold_idx = fold_idx + 1
+            args.test_subject = current_test_subject
             
-            # Evaluate on test set (left-out subject)
+            # Load models
+            if not args.train_classifier:
+                # Load encoder
+                encoder = create_encoder(args)
+                if args.load_encoder:
+                    encoder_checkpoint_path = args.encoder_path
+                else:
+                    encoder_model_name = f"best_model_{run_id}.pth"
+                    encoder_checkpoint_path = os.path.join(encoder_save_path, encoder_model_name)
+                
+                logger.info(f"Loading encoder from: {encoder_checkpoint_path}")
+                encoder = load_pretrained_encoder(encoder, encoder_checkpoint_path)
+                
+                # Create classifier
+                classifier = create_classifier(args, encoder)
+                
+                # Load classifier checkpoint
+                if args.load_classifier and args.classifier_path:
+                    classifier_checkpoint_path = args.classifier_path
+                else:
+                    classifier_model_name = f"best_model_{run_id}.pth"
+                    classifier_checkpoint_path = os.path.join(classifier_save_path, classifier_model_name)
+                
+                logger.info(f"Loading classifier from: {classifier_checkpoint_path}")
+                checkpoint = torch.load(classifier_checkpoint_path, map_location=args.device, weights_only=False)
+                classifier.load_state_dict(checkpoint['model_state_dict'])
+            
+            # Evaluate on test set
             acc, f_w, f_macro, f_micro = evaluate_classifier(args, classifier, test_loader, classifier_save_path)
             
             results['subject_id'].append(current_test_subject)

@@ -25,7 +25,7 @@ class MTLDeepConvLSTMAttnEncoder(nn.Module):
         self.encoder = DeepConvLSTMAttnEncoder(args)
         
         # LSTM output size (size after Attention combination)
-        self.hidden_size = args.get('attention_size', 128)
+        self.hidden_size = self.encoder.embedding_dim
         
         # Device configuration
         self.device = args.get('device', 'cpu')
@@ -135,3 +135,35 @@ class MTLDeepConvLSTMAttnEncoder(nn.Module):
             Encoded feature vector [batch_size, attention_size]
         """
         return self.encoder.extract_features(x) 
+    
+    def freeze_cnn_lstm_only(self):
+        """
+        Freeze only CNN and LSTM layers while keeping attention layers trainable
+        Delegates to base encoder's implementation
+        """
+        # Use base encoder's method
+        self.encoder.freeze_cnn_lstm_only()
+        
+    def freeze_all(self):
+        """
+        Freeze all encoder parameters including base encoder and MTL heads
+        """
+        # Freeze base encoder
+        self.encoder.freeze_all()
+        
+        # Freeze MTL heads
+        for head in self.task_heads.values():
+            for param in head.parameters():
+                param.requires_grad = False
+        
+    def unfreeze_all(self):
+        """
+        Unfreeze all encoder parameters for full fine-tuning
+        """
+        # Unfreeze base encoder
+        self.encoder.unfreeze_all()
+        
+        # Unfreeze MTL heads
+        for head in self.task_heads.values():
+            for param in head.parameters():
+                param.requires_grad = True 

@@ -41,6 +41,18 @@ class ClassifierTrainer:
         self.logger = Logger(f"classifier_{args.encoder_type}_{args.classifier_type}")
         self.logger.info(f"Using device: {self.device}")
         
+        # Check if encoder freezing is enabled and apply the correct freezing mode
+        if args.freeze_encoder:
+            self.logger.info("Freezing encoder parameters during classifier training")
+            if args.encoder_type == 'deepconvlstm_attn':
+                # For attention models, freeze only CNN and LSTM parts
+                self.logger.info("For DeepConvLSTM-Attn: Freezing only CNN and LSTM layers, keeping attention layers trainable")
+                self.model.freeze_encoder(freeze_mode='cnn_lstm_only')
+            else:
+                # For other encoder types, freeze all parameters
+                self.logger.info("Freezing all encoder parameters")
+                self.model.freeze_encoder(freeze_mode='all')
+        
         # Loss function
         self.criterion = nn.CrossEntropyLoss()
         

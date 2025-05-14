@@ -20,7 +20,7 @@ class SAHARClassifier(nn.Module):
         
     def forward(self, x):
         # Extract features from encoder
-        features = self.encoder.get_embedding(x)
+        features = self.encoder.extract_features(x)
         
         # First FC layer
         x = self.fc1(features)
@@ -32,12 +32,21 @@ class SAHARClassifier(nn.Module):
         
         return output
     
-    def freeze_encoder(self):
-        """freeze encoder parameters"""
-        for param in self.encoder.parameters():
-            param.requires_grad = False
+    def freeze_encoder(self, freeze_mode='all'):
+        """
+        Freeze encoder parameters using specified mode
+        
+        Args:
+            freeze_mode: Mode to freeze encoder ('all')
+        """
+        if freeze_mode == 'all':
+            self.encoder.freeze_all()
+        else:
+            raise ValueError(f"Unsupported freeze mode for SA-HAR: {freeze_mode}. " 
+                           "Available mode: 'all'")
             
     def unfreeze_encoder(self):
-        """unfreeze encoder parameters"""
-        for param in self.encoder.parameters():
-            param.requires_grad = True 
+        """
+        Unfreeze all encoder parameters for full fine-tuning
+        """
+        self.encoder.unfreeze_all() 

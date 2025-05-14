@@ -25,7 +25,7 @@ class MTLDeepConvLSTMEncoder(nn.Module):
         self.encoder = DeepConvLSTMEncoder(args)
         
         # LSTM output size (hidden_dim set in DeepConvLSTM)
-        self.hidden_size = args.get('lstm_hidden_size', 128)
+        self.hidden_size = self.encoder.embedding_dim
         
         # Device configuration
         self.device = args.get('device', 'cpu')
@@ -133,3 +133,27 @@ class MTLDeepConvLSTMEncoder(nn.Module):
             Encoded feature vector [batch_size, hidden_size]
         """
         return self.encoder.extract_features(x) 
+        
+    def freeze_all(self):
+        """
+        Freeze all encoder parameters including base encoder and MTL heads
+        """
+        # Freeze base encoder
+        self.encoder.freeze_all()
+        
+        # Freeze MTL heads
+        for head in self.task_heads.values():
+            for param in head.parameters():
+                param.requires_grad = False
+        
+    def unfreeze_all(self):
+        """
+        Unfreeze all encoder parameters for full fine-tuning
+        """
+        # Unfreeze base encoder
+        self.encoder.unfreeze_all()
+        
+        # Unfreeze MTL heads
+        for head in self.task_heads.values():
+            for param in head.parameters():
+                param.requires_grad = True 
