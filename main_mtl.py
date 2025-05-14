@@ -8,28 +8,31 @@ from dataloaders.data_loader import PAMAP2, get_data
 from utils.training_utils import set_seed, save_results_summary
 from utils.logger import Logger
 
-from train_encoder import create_encoder, load_pretrained_encoder, EncoderTrainer
+from train_encoder_mtl import create_mtl_encoder, load_pretrained_mtl_encoder, SelfSupMTLTrainer, get_transform_functions
 from train_classifier import create_classifier, ClassifierTrainer, evaluate_classifier
 
 if __name__ == '__main__': 
     args = get_args()
 
+    # Activate MTL mode
+    args.mtl_mode = True
+
     # Timestamp
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     args.timestamp = timestamp
     
-    logger = Logger(f"har_{args.encoder_type}_{args.classifier_type}")
+    logger = Logger(f"mtl_{args.encoder_type}_{args.classifier_type}")
 
     # Random Seed
     set_seed(args.seed)
     logger.info(f"Random Seed: {args.seed}")
-    logger.info(f"Using encoder type: {args.encoder_type}, classifier type: {args.classifier_type}")
+    logger.info(f"Using MTL encoder type: {args.encoder_type}, classifier type: {args.classifier_type}")
 
     # Load dataset
     dataset = PAMAP2(args)
-    logger.info(f"Dataset: {args.data_name} loaded") 
+    logger.info(f"Dataset: {args.data_name} loaded")
 
-    # for test performance aggregation (if args.test==True)
+    # For test performance aggregation (when args.test==True)
     results = {
         'subject_id': [],
         'accuracy': [],
@@ -60,7 +63,7 @@ if __name__ == '__main__':
         
         logger.info(f"Fold {fold_idx+1}/{len(dataset.LOCV_keys)}: Testing on Subject {current_test_subject}, Training on Subjects {dataset.train_keys}")
 
-        # Create data loaders - use classifier batch size if training classifier
+        # Create data loaders - use classifier batch size when training classifier
         batch_size = args.classifier_batch_size if args.train_classifier else args.batch_size
         train_loader = get_data(dataset, batch_size, flag="train")
         valid_loader = get_data(dataset, batch_size, flag="valid") 
@@ -74,8 +77,9 @@ if __name__ == '__main__':
         run_id = Logger.get_run_id()
         
         # Directory timestamp format should match folder structure
-        encoder_save_path = os.path.join(args.encoder_save_path, f"{args.encoder_type}_{timestamp}", fold_dir)
-        classifier_save_path = os.path.join(args.classifier_save_path, f"{args.encoder_type}_{args.classifier_type}_{timestamp}", fold_dir)
+        # Add 'mtl_' prefix to indicate MTL model
+        encoder_save_path = os.path.join(args.encoder_save_path, f"mtl_{args.encoder_type}_{timestamp}", fold_dir)
+        classifier_save_path = os.path.join(args.classifier_save_path, f"mtl_{args.encoder_type}_{args.classifier_type}_{timestamp}", fold_dir)
         
         # Create directories and save fold information
         os.makedirs(encoder_save_path, exist_ok=True)
@@ -87,20 +91,26 @@ if __name__ == '__main__':
             f.write(f"Test Subject: {current_test_subject}\n")
             f.write(f"Train Subjects: {dataset.train_keys}\n")
             f.write(f"Data Split: train={len(train_loader.dataset)}, valid={len(valid_loader.dataset)}, test={len(test_loader.dataset)} samples\n")
-            f.write(f"Encoder Type: {args.encoder_type}\n")
+            f.write(f"Encoder Type: MTL_{args.encoder_type}\n")
             f.write(f"Classifier Type: {args.classifier_type}\n")
             f.write(f"Timestamp: {timestamp}\n")
             f.write(f"Run ID: {run_id}\n")
 
-         # ============Step 1: Encoder Training============
+        # ============Step 1: MTL Encoder Training============
         if args.train_encoder:
-            logger.info(f"Training encoder for fold {fold_idx+1}, test subject {current_test_subject}")
+            logger.info(f"Training MTL encoder for fold {fold_idx+1}, test subject {current_test_subject}")
             
-            encoder = create_encoder(args)
-            encoder_trainer = EncoderTrainer(args, encoder, encoder_save_path)
-            encoder = encoder_trainer.train(train_loader, valid_loader)
+            # Create MTL encoder
+            mtl_encoder = create_mtl_encoder(args)
             
-            logger.info(f"Encoder training completed for fold {fold_idx+1}")
+            # Get transformation functions
+            transform_funcs = get_transform_functions()
+            
+            # Create and train MTL Trainer
+            mtl_encoder_trainer = SelfSupMTLTrainer(args, mtl_encoder, transform_funcs, encoder_save_path)
+            mtl_encoder = mtl_encoder_trainer.train(train_loader, valid_loader)
+            
+            logger.info(f"MTL encoder training completed for fold {fold_idx+1}")
         
         # ============Step 2: Classifier Training============
         if args.train_classifier:
@@ -110,24 +120,27 @@ if __name__ == '__main__':
             args.train_epochs = args.classifier_epochs
             
             # random initialization
-            encoder = create_encoder(args)
+            mtl_encoder = create_mtl_encoder(args)
             if args.load_encoder:
                 encoder_checkpoint_path = args.encoder_path
             else:
                 encoder_model_name = f"best_model_{run_id}.pth"
                 encoder_checkpoint_path = os.path.join(encoder_save_path, encoder_model_name)
             
-            logger.info(f"Loading encoder from: {encoder_checkpoint_path}")
-            encoder = load_pretrained_encoder(encoder, encoder_checkpoint_path)
+            logger.info(f"Loading MTL encoder from: {encoder_checkpoint_path}")
+            mtl_encoder = load_pretrained_mtl_encoder(mtl_encoder, encoder_checkpoint_path)
             
             # Configure whether to freeze encoder parameters
             if args.freeze_encoder:
-                logger.info("Freezing encoder parameters during classifier training")
-                for param in encoder.parameters():
+                logger.info("Freezing MTL encoder parameters during classifier training")
+                for param in mtl_encoder.parameters():
                     param.requires_grad = False
             
+            # Extract base encoder from encoder model (accessed through .encoder attribute in MTL)
+            base_encoder = mtl_encoder.encoder
+            
             # Create and train classifier
-            classifier = create_classifier(args, encoder)
+            classifier = create_classifier(args, base_encoder)
             classifier_trainer = ClassifierTrainer(args, classifier, classifier_save_path)
             classifier = classifier_trainer.train(train_loader, valid_loader)
             
@@ -138,17 +151,22 @@ if __name__ == '__main__':
             logger.info(f"Testing on subject {current_test_subject} (fold {fold_idx+1})")
             
             # Load models
-            encoder = create_encoder(args)
+            mtl_encoder = create_mtl_encoder(args)
+            
             if args.load_encoder:
                 encoder_checkpoint_path = args.encoder_path
             else:
                 encoder_model_name = f"best_model_{run_id}.pth"
                 encoder_checkpoint_path = os.path.join(encoder_save_path, encoder_model_name)
             
-            logger.info(f"Loading encoder from: {encoder_checkpoint_path}")
-            encoder = load_pretrained_encoder(encoder, encoder_checkpoint_path)
+            logger.info(f"Loading MTL encoder from: {encoder_checkpoint_path}")
+            mtl_encoder = load_pretrained_mtl_encoder(mtl_encoder, encoder_checkpoint_path)
             
-            classifier = create_classifier(args, encoder)
+            # Extract base encoder (accessed through .encoder attribute in MTL)
+            base_encoder = mtl_encoder.encoder
+            
+            # Create classifier
+            classifier = create_classifier(args, base_encoder)
             
             # Load classifier checkpoint
             if args.load_classifier and args.classifier_path:
@@ -176,6 +194,8 @@ if __name__ == '__main__':
     
     # Summarize all fold results if testing was performed
     if args.test and len(results['subject_id']) > 0:
+        # Mark as MTL
+        args.encoder_type = f"mtl_{args.encoder_type}"
         save_results_summary(results, args, timestamp)
     
-    logger.info("All processes completed successfully.") 
+    logger.info("All MTL processes completed successfully.") 

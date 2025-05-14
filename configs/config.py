@@ -20,9 +20,9 @@ def get_args():
     parser.add_argument('-d', '--data_name', default='pamap2', type=str, help='Name of the Dataset')    
     # Model
     parser.add_argument('-e', '--encoder_type', default='deepconvlstm', type=str, 
-                        help='Encoder Type (deepconvlstm, deepconvlstm_attn, sa_har)')
+                         help='Encoder Type (deepconvlstm, deepconvlstm_attn, sa_har)')
     parser.add_argument('-c', '--classifier_type', default='deepconvlstm_classifier', type=str, 
-                        help='Classifier Type (deepconvlstm_classifier, deepconvlstm_attn_classifier, sa_har_classifier). If not specified, will auto-select based on encoder type.')
+                         help='Classifier Type (deepconvlstm_classifier, deepconvlstm_attn_classifier, sa_har_classifier). If not specified, will auto-select based on encoder type.')
     
     # Training mode settings
     parser.add_argument('--train_encoder', default=True, type=str2bool, help='Train Encoder')
@@ -36,11 +36,32 @@ def get_args():
     # load classifier weights
     parser.add_argument('--load_classifier', default=False, type=str2bool, help='Load pre-trained classifier')
     parser.add_argument('--classifier_path', default=None, type=str, help='Path to pre-trained classifier')
-
+ 
     # LOOCV settings
     parser.add_argument('--specific_subject', default=None, type=int, help='Test only specific subject (1-8), None to test all subjects')
     
+    # MTL pretraining settings
+    parser.add_argument('--mtl_mode', default=False, type=str2bool, help='Use MTL SSL pretraining')
+    parser.add_argument('--task_weights_jitter', type=float, default=1.0, help='Weight for jitter task')
+    parser.add_argument('--task_weights_scaling', type=float, default=1.0, help='Weight for scaling task')
+    parser.add_argument('--task_weights_mag_warp', type=float, default=1.0, help='Weight for magnitude warping task')
+    parser.add_argument('--task_weights_time_warp', type=float, default=1.0, help='Weight for time warping task')
+    parser.add_argument('--task_weights_rotation', type=float, default=1.0, help='Weight for rotation task')
+    parser.add_argument('--task_weights_permutation', type=float, default=1.0, help='Weight for permutation task')
+    parser.add_argument('--task_weights_cropping', type=float, default=1.0, help='Weight for cropping task')
+    
     args = parser.parse_args()
+    
+    # MTL task weights
+    args.task_weights = {
+        'jitter': args.task_weights_jitter,
+        'scaling': args.task_weights_scaling,
+        'mag_warp': args.task_weights_mag_warp,
+        'time_warp': args.task_weights_time_warp,
+        'rotation': args.task_weights_rotation,
+        'permutation': args.task_weights_permutation,
+        'cropping': args.task_weights_cropping
+    }
         
     # data config
     config_file = open('configs/data.yaml', mode='r')
