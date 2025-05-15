@@ -239,7 +239,7 @@ class DeepConvLSTMAttnEncoder(EncoderBase):
             ECDF features [batch_size, 3, 78]
         """
         # Extract embeddings with attention applied
-        features = self.get_embedding(x)
+        features = self.get_embedding(x) # (B, 168, 9) -> (B, 128)
         
         # Use attention-enhanced features to predict ECDF features
         outputs = []

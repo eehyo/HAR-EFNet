@@ -75,10 +75,19 @@ def get_args():
     args.classifier_save_path = os.path.join(args.save_path, "classifiers")
     args.results_save_path = os.path.join(args.save_path, "results")
     
-    args.use_gpu = torch.cuda.is_available()
-    args.device = torch.device("cuda" if args.use_gpu else "cpu")
-    args.gpu = 6
-    args.use_multi_gpu = False
+    # GPU settings
+    args.use_gpu = True if torch.cuda.is_available() else False
+    args.use_multi_gpu = True
+    args.gpu = 3
+    args.devices = "0,1,2,3,4,5,6,7"
+    
+    if args.use_gpu:
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu) if not args.use_multi_gpu else args.devices
+        args.device = torch.device(f'cuda:{args.gpu}')
+        print(f'Device: GPU, cuda:{args.gpu}')
+    else:
+        args.device = torch.device('cpu')
+        print('Device: CPU')
     
     args.optimizer = "Adam"
     args.criterion = "MSELoss" if args.train_encoder else "CrossEntropy"

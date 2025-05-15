@@ -9,8 +9,8 @@ from typing import Tuple, Dict, List, Optional, Any, Union, Callable
 
 from encoders import MTLDeepConvLSTMEncoder, MTLDeepConvLSTMAttnEncoder, MTLSAHAREncoder
 from dataloaders.data_transformations import (
-    DA_Jitter, DA_Scaling, DA_MagWarp, DA_TimeWarp, 
-    DA_Rotation, DA_Permutation, DA_Cropping
+    DA_Jitter, DA_Scaling, DA_MagnitudeWarp, DA_TimeWarp, 
+    DA_Rotation, DA_Permutation, DA_Cropping, DA_Rotation_9axis
 )
 from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
 from utils.logger import Logger
@@ -89,7 +89,7 @@ class MTLEncoderTrainer:
 
         # Apply transformations for each sample
         for x in batch_x:
-            x_np = x.cpu().numpy()  # [T, C]
+            x_np = x.cpu().numpy()  # [168, 9]
             x_aug = []
             y_bin = []
             
@@ -300,6 +300,7 @@ def create_mtl_encoder(args: Any) -> nn.Module:
     encoder_args = {
         'input_channels': args.input_channels,
         'window_size': args.window_size,
+        'output_size': args.output_size, # (3, 78)
         'device': args.device
     }
     
@@ -383,7 +384,7 @@ def get_transform_functions() -> Dict[str, Callable]:
     
     # Wrap each transformation function with fixed arguments
     def mag_warp_func(x):
-        return DA_MagWarp(x, **mag_warp_args)
+        return DA_MagnitudeWarp(x, **mag_warp_args)
     
     def time_warp_func(x):
         return DA_TimeWarp(x, **time_warp_args)
@@ -400,7 +401,8 @@ def get_transform_functions() -> Dict[str, Callable]:
         'scaling': lambda x: DA_Scaling(x, sigma=0.1),
         'mag_warp': mag_warp_func,
         'time_warp': time_warp_func,
-        'rotation': DA_Rotation,
+        # 'rotation': DA_Rotation,
+        'rotation_9axis': DA_Rotation_9axis,
         'permutation': permutation_func,
         'cropping': cropping_func
     }

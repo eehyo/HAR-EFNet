@@ -7,10 +7,10 @@ import numpy as np
 Based on work of T. T. Um et al.: https://arxiv.org/abs/1706.00527
 Contact: Terry Taewoong Um (terry.t.um@gmail.com)
 
-T. T. Um et al., “Data augmentation of wearable sensor data for parkinson’s 
-disease monitoring using convolutional neural networks,” in Proceedings of 
+T. T. Um et al., "Data augmentation of wearable sensor data for parkinson’s 
+disease monitoring using convolutional neural networks," in Proceedings of 
 the 19th ACM International Conference on Multimodal Interaction, ser. ICMI 
-2017. New York, NY, USA: ACM, 2017, pp. 216–220.
+2017. New York, NY, USA: ACM, 2017, pp. 216-220.
 
 https://dl.acm.org/citation.cfm?id=3136817
 
@@ -78,11 +78,30 @@ def DA_TimeWarp(X, sigma=0.2, knot=4):
         X_new[:, i] = np.interp(x_range, tt_new[:, i], X[:, i])
     return X_new
 
+# TODO: 9채널 회전 추가
 # 5. Rotation
 def DA_Rotation(X):
     axis = np.random.uniform(low=-1, high=1, size=X.shape[1])
     angle = np.random.uniform(low=-np.pi, high=np.pi)
     return np.matmul(X , axangle2mat(axis,angle))
+
+# 5-1. Rotation for 9-axis IMU data
+def DA_Rotation_9axis(X):
+    """
+    X: [T, 9] where columns are [x1, y1, z1, x2, y2, z2, x3, y3, z3]
+    Applies the same random rotation to each 3D triplet
+    """
+    assert X.shape[1] == 9, f"Expected 9 channels but got {X.shape[1]}"
+    axis = np.random.uniform(low=-1, high=1, size=3)
+    angle = np.random.uniform(low=-np.pi, high=np.pi)
+    R = axangle2mat(axis, angle)  # [3, 3]
+
+    X_rot = np.zeros_like(X)
+    for i in range(3):  # For each 3D group
+        vec = X[:, i*3:(i+1)*3]  # [T, 3]
+        X_rot[:, i*3:(i+1)*3] = np.dot(vec, R)  # rotate each group
+
+    return X_rot
 
 # 6. Permutation
 # Splits the signal into segments and randomly permutes them
