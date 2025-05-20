@@ -1,5 +1,5 @@
 from scipy.interpolate import CubicSpline      # for warping
-from transforms3d.axangles import axangle2mat  # for rotation
+import math
 import numpy as np
 
 
@@ -47,8 +47,8 @@ def DA_Scaling(X, sigma=0.1):
 ## This example using cubic splice is not the best approach to generate random curves. 
 ## You can use other aprroaches, e.g., Gaussian process regression, Bezier curve, etc.
 def GenerateRandomCurves(X, sigma=0.2, knot=4):
-    xx = np.linspace(0, X.shape[0] - 1, num=knot + 2) # 모든 채널이 공유하는 시간 포인트
-    yy = np.random.normal(loc=1.0, scale=sigma, size=(knot + 2, X.shape[1])) # 채널별 다른 랜덤 값
+    xx = np.linspace(0, X.shape[0] - 1, num=knot + 2) 
+    yy = np.random.normal(loc=1.0, scale=sigma, size=(knot + 2, X.shape[1])) 
     x_range = np.arange(X.shape[0])
     warped = np.zeros_like(X)
     for i in range(X.shape[1]):
@@ -80,28 +80,84 @@ def DA_TimeWarp(X, sigma=0.2, knot=4):
 
 # TODO: 9채널 회전 추가
 # 5. Rotation
-def DA_Rotation(X):
-    axis = np.random.uniform(low=-1, high=1, size=X.shape[1])
-    angle = np.random.uniform(low=-np.pi, high=np.pi)
-    return np.matmul(X , axangle2mat(axis,angle))
+# def DA_Rotation(X):
+#     axis = np.random.uniform(low=-1, high=1, size=X.shape[1])
+#     angle = np.random.uniform(low=-np.pi, high=np.pi)
+#     return np.matmul(X , axangle2mat(axis,angle))
 
-# 5-1. Rotation for 9-axis IMU data
+# 5-1. Rotation for 9-axis IMU data (Sample-wise Rotation)
 def DA_Rotation_9axis(X):
     """
-    X: [T, 9] where columns are [x1, y1, z1, x2, y2, z2, x3, y3, z3]
-    Applies the same random rotation to each 3D triplet
+    Applies the same 3D rotation to each sensor triplet (x, y, z)
+    [x1, y1, z1, x2, y2, z2, x3, y3, z3]
+    Input:
+        X: [T, 9] - 3 sensors × 3-axis (x, y, z)
+    Output:
+        X_rot: [T, 9] - rotated data
     """
+    # 샘플마다 R은 새로 생성됨
     assert X.shape[1] == 9, f"Expected 9 channels but got {X.shape[1]}"
     axis = np.random.uniform(low=-1, high=1, size=3)
     angle = np.random.uniform(low=-np.pi, high=np.pi)
-    R = axangle2mat(axis, angle)  # [3, 3]
+    # 회전 행렬 생성 (공통)
+    R = axangle2mat(axis, angle, is_normalized=False)  # [3, 3]
+
 
     X_rot = np.zeros_like(X)
-    for i in range(3):  # For each 3D group
+    for i in range(3):  # Apply to each 3D sensor group
         vec = X[:, i*3:(i+1)*3]  # [T, 3]
-        X_rot[:, i*3:(i+1)*3] = np.dot(vec, R)  # rotate each group
+        # rotate each group
+        # 3개의 센서 그룹 (x, y, z) 각각에 동일한 R 적용
+        X_rot[:, i*3:(i+1)*3] = vec @ R  # [T, 3] × [3, 3]
 
     return X_rot
+
+# 5-2. Rotation for 9-axis IMU data (Sensor-wise Rotation)
+def DA_Rotation_9axis_per_sensor(X):
+    """
+    Applies a different random 3D rotation to each sensor triplet (x, y, z).
+    For input [x1, y1, z1, x2, y2, z2, x3, y3, z3], each (x, y, z) group gets its own rotation.
+
+    Input:
+        X: [T, 9] - 3 sensors × 3-axis (x, y, z)
+    Output:
+        X_rot: [T, 9] - rotated data with different R per sensor
+    """
+    assert X.shape[1] == 9, f"Expected 9 channels but got {X.shape[1]}"
+    X_rot = np.zeros_like(X)
+
+    for i in range(3):  # For each of the 3 sensor groups
+        axis = np.random.uniform(low=-1, high=1, size=3)
+        axis = axis / np.linalg.norm(axis)
+        angle = np.random.uniform(low=-np.pi, high=np.pi)
+        R = axangle2mat(axis, angle, is_normalized=True)  # 개별 회전 행렬
+
+        vec = X[:, i*3:(i+1)*3]  # [T, 3]
+        X_rot[:, i*3:(i+1)*3] = vec @ R  # 회전 적용
+
+    return X_rot
+
+def axangle2mat(axis, angle, is_normalized=False):
+    ''' Rotation matrix for rotation angle `angle` around `axis`
+    Notes
+    -----
+    Reference: the Transforms3d package - transforms3d.axangles.axangle2mat
+    From: http://en.wikipedia.org/wiki/Rotation_matrix#Axis_and_angle
+    '''
+    x, y, z = axis
+    if not is_normalized:
+        n = math.sqrt(x*x + y*y + z*z)
+        x = x/n
+        y = y/n
+        z = z/n
+    c = math.cos(angle); s = math.sin(angle); C = 1-c
+    xs = x*s;   ys = y*s;   zs = z*s
+    xC = x*C;   yC = y*C;   zC = z*C
+    xyC = x*yC; yzC = y*zC; zxC = z*xC
+    return np.array([
+            [ x*xC+c,   xyC-zs,   zxC+ys ],
+            [ xyC+zs,   y*yC+c,   yzC-xs ],
+            [ zxC-ys,   yzC+xs,   z*zC+c ]])
 
 # 6. Permutation
 # Splits the signal into segments and randomly permutes them

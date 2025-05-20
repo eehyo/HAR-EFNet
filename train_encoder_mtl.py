@@ -88,6 +88,7 @@ class MTLEncoderTrainer:
         Y = []      # [B, num_tasks]
 
         # Apply transformations for each sample
+        # [B, T, C] -> [T, C]
         for x in batch_x:
             x_np = x.cpu().numpy()  # [168, 9]
             x_aug = []
