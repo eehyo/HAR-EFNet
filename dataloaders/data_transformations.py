@@ -7,7 +7,7 @@ import numpy as np
 Based on work of T. T. Um et al.: https://arxiv.org/abs/1706.00527
 Contact: Terry Taewoong Um (terry.t.um@gmail.com)
 
-T. T. Um et al., "Data augmentation of wearable sensor data for parkinson’s 
+T. T. Um et al., "Data augmentation of wearable sensor data for parkinson's 
 disease monitoring using convolutional neural networks," in Proceedings of 
 the 19th ACM International Conference on Multimodal Interaction, ser. ICMI 
 2017. New York, NY, USA: ACM, 2017, pp. 216-220.
@@ -22,7 +22,7 @@ Neural Networks}, booktitle = {Proceedings of the 19th ACM International
 Conference on Multimodal Interaction}, series = {ICMI 2017}, year = {2017}, 
 isbn = {978-1-4503-5543-8}, location = {Glasgow, UK}, pages = {216--220}, 
 numpages = {5}, doi = {10.1145/3136755.3136817}, acmid = {3136817}, publisher 
-= {ACM}, address = {New York, NY, USA}, keywords = {Parkinson\&#39;s disease, 
+= {ACM}, address = {New York, NY, USA}, keywords = {Parkinson&#39;s disease, 
 convolutional neural networks, data augmentation, health monitoring, 
 motor state detection, wearable sensor}, }
 """
@@ -78,42 +78,9 @@ def DA_TimeWarp(X, sigma=0.2, knot=4):
         X_new[:, i] = np.interp(x_range, tt_new[:, i], X[:, i])
     return X_new
 
-# TODO: 9채널 회전 추가
-# 5. Rotation
-# def DA_Rotation(X):
-#     axis = np.random.uniform(low=-1, high=1, size=X.shape[1])
-#     angle = np.random.uniform(low=-np.pi, high=np.pi)
-#     return np.matmul(X , axangle2mat(axis,angle))
-
-# 5-1. Rotation for 9-axis IMU data (Sample-wise Rotation)
-def DA_Rotation_9axis(X):
-    """
-    Applies the same 3D rotation to each sensor triplet (x, y, z)
-    [x1, y1, z1, x2, y2, z2, x3, y3, z3]
-    Input:
-        X: [T, 9] - 3 sensors × 3-axis (x, y, z)
-    Output:
-        X_rot: [T, 9] - rotated data
-    """
-    # 샘플마다 R은 새로 생성됨
-    assert X.shape[1] == 9, f"Expected 9 channels but got {X.shape[1]}"
-    axis = np.random.uniform(low=-1, high=1, size=3)
-    angle = np.random.uniform(low=-np.pi, high=np.pi)
-    # 회전 행렬 생성 (공통)
-    R = axangle2mat(axis, angle, is_normalized=False)  # [3, 3]
-
-
-    X_rot = np.zeros_like(X)
-    for i in range(3):  # Apply to each 3D sensor group
-        vec = X[:, i*3:(i+1)*3]  # [T, 3]
-        # rotate each group
-        # 3개의 센서 그룹 (x, y, z) 각각에 동일한 R 적용
-        X_rot[:, i*3:(i+1)*3] = vec @ R  # [T, 3] × [3, 3]
-
-    return X_rot
 
 # 5-2. Rotation for 9-axis IMU data (Sensor-wise Rotation)
-def DA_Rotation_9axis_per_sensor(X):
+def DA_Rotation_per_sensor(X):
     """
     Applies a different random 3D rotation to each sensor triplet (x, y, z).
     For input [x1, y1, z1, x2, y2, z2, x3, y3, z3], each (x, y, z) group gets its own rotation.
@@ -178,23 +145,32 @@ def DA_Permutation(X, nPerm=4, minSegLength=10):
     return X_new
 
 # 7. Cropping
-# Randomly crops a subwindow and resizes back to original length
-def DA_Cropping(X, crop_ratio=0.9):
+# Randomly crops a contiguous window from the time series
+def DA_Cropping(X, crop_size, start=None):
     """
-    X: np.ndarray of shape [T, C]
-    crop_ratio: proportion of original length to retain (e.g., 0.9 means 90% kept)
+    Crops a segment of length `crop_size` and zero-pads it to match original length.
+
+    Parameters:
+    - X: np.ndarray of shape (T, C)
+    - crop_size: int, desired crop length
+    - start: int, optional starting index. If None, randomly selected.
+
+    Returns:
+    - X_padded: np.ndarray of shape (T, C)
     """
     T, C = X.shape
-    crop_len = int(T * crop_ratio)
-    start = np.random.randint(0, T - crop_len)
-    cropped = X[start:start + crop_len]
+    assert crop_size <= T, "crop_size must be less than or equal to the sequence length"
 
-    # Resize to original length using linear interpolation
-    resized = np.zeros((T, C))
-    for i in range(C):
-        resized[:, i] = np.interp(
-            np.linspace(0, crop_len - 1, num=T),
-            np.arange(crop_len),
-            cropped[:, i]
-        )
-    return resized
+    max_start = T - crop_size
+    if start is None:
+        start = np.random.randint(0, max_start + 1)
+    else:
+        start = max(0, min(start, max_start))  # ❗ 보정 포인트
+
+    X_crop = X[start:start + crop_size, :]  # [crop_size, C]
+
+    # Zero-pad to original length T
+    pad_len = T - crop_size
+    X_padded = np.pad(X_crop, pad_width=((0, pad_len), (0, 0)), mode='constant')
+
+    return X_padded  # shape: (T, C)

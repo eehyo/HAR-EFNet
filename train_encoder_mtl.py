@@ -10,7 +10,7 @@ from typing import Tuple, Dict, List, Optional, Any, Union, Callable
 from encoders import MTLDeepConvLSTMEncoder, MTLDeepConvLSTMAttnEncoder, MTLSAHAREncoder
 from dataloaders.data_transformations import (
     DA_Jitter, DA_Scaling, DA_MagnitudeWarp, DA_TimeWarp, 
-    DA_Rotation, DA_Permutation, DA_Cropping, DA_Rotation_9axis
+    DA_Permutation, DA_Cropping, DA_Rotation_per_sensor
 )
 from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
 from utils.logger import Logger
@@ -381,7 +381,7 @@ def get_transform_functions() -> Dict[str, Callable]:
     mag_warp_args = {'sigma': 0.2, 'knot': 4}
     time_warp_args = {'sigma': 0.2}
     permutation_args = {'nPerm': 4, 'minSegLength': 10}
-    cropping_args = {'crop_ratio': 0.9}
+    cropping_args = {'crop_size': 100}
     
     # Wrap each transformation function with fixed arguments
     def mag_warp_func(x):
@@ -402,8 +402,7 @@ def get_transform_functions() -> Dict[str, Callable]:
         'scaling': lambda x: DA_Scaling(x, sigma=0.1),
         'mag_warp': mag_warp_func,
         'time_warp': time_warp_func,
-        # 'rotation': DA_Rotation,
-        'rotation_9axis': DA_Rotation_9axis,
+        'rotation': DA_Rotation_per_sensor,
         'permutation': permutation_func,
         'cropping': cropping_func
     }
