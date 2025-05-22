@@ -10,7 +10,7 @@ from typing import Tuple, Dict, List, Optional, Any, Union, Callable
 from encoders import MTLDeepConvLSTMEncoder, MTLDeepConvLSTMAttnEncoder, MTLSAHAREncoder
 from dataloaders.data_transformations import (
     DA_Jitter, DA_Scaling, DA_MagnitudeWarp, DA_TimeWarp, 
-    DA_Permutation, DA_Cropping, DA_Rotation_per_sensor
+    DA_Permutation, DA_Rotation_per_sensor, DA_Cropping
 )
 from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
 from utils.logger import Logger
@@ -51,8 +51,7 @@ class MTLEncoderTrainer:
         # Loss function: BCE Loss for binary classification
         self.criterion = nn.BCELoss()
         
-        # Configure optimizer
-        # L2 regularization 대신 weight decay 사용
+        # Configure optimizer with L2 regularization (weight decay) of 0.0001
         if args.optimizer == "Adam":
             self.optimizer = optim.Adam(self.model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
         else:

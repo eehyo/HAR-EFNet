@@ -95,8 +95,9 @@ def get_args():
     args.datanorm_type = "standardization"
     
     # training settings
-    args.train_epochs = 300
-    args.learning_rate = 0.0005
+    # mtl: maximum of 30 epochs with a learning rate of 0.0003
+    args.train_epochs = 30
+    args.learning_rate = 0.0003 # 0.0005
     args.weight_decay = 0.0001  # mtl weight decay
     args.learning_rate_patience = 7
     args.learning_rate_factor = 0.1
@@ -107,7 +108,7 @@ def get_args():
     args.train_vali_quote = 0.90
 
     args.classifier_lr = 0.0001
-    args.classifier_epochs = 300
+    args.classifier_epochs = 30
     args.classifier_batch_size = 256
     args.freeze_encoder = True  # Freeze
     

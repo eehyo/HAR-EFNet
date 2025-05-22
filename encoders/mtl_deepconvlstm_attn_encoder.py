@@ -35,48 +35,54 @@ class MTLDeepConvLSTMAttnEncoder(nn.Module):
         
         # Task-specific binary classification heads (MTL)
         # TPN : fc layer of 256 hidden units followed by a sigmoidal output layer for binary classication
-        # TODO: Consider changing to 256 units later
         self.task_heads = nn.ModuleDict({
             'jitter': nn.Sequential(
-                nn.Linear(self.hidden_size, 64),
+                nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
-                nn.Linear(64, 1),
+                nn.Dropout(0.1),
+                nn.Linear(256, 1),
                 nn.Sigmoid()
             ),
             'scaling': nn.Sequential(
-                nn.Linear(self.hidden_size, 64),
+                nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
-                nn.Linear(64, 1),
+                nn.Dropout(0.1),
+                nn.Linear(256, 1),
                 nn.Sigmoid()
             ),
             'mag_warp': nn.Sequential(
-                nn.Linear(self.hidden_size, 64),
+                nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
-                nn.Linear(64, 1),
+                nn.Dropout(0.1),
+                nn.Linear(256, 1),
                 nn.Sigmoid()
             ),
             'time_warp': nn.Sequential(
-                nn.Linear(self.hidden_size, 64),
+                nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
-                nn.Linear(64, 1),
+                nn.Dropout(0.1),
+                nn.Linear(256, 1),
                 nn.Sigmoid()
             ),
             'rotation': nn.Sequential(
-                nn.Linear(self.hidden_size, 64),
+                nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
-                nn.Linear(64, 1),
+                nn.Dropout(0.1),
+                nn.Linear(256, 1),
                 nn.Sigmoid()
             ),
             'permutation': nn.Sequential(
-                nn.Linear(self.hidden_size, 64),
+                nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
-                nn.Linear(64, 1),
+                nn.Dropout(0.1),
+                nn.Linear(256, 1),
                 nn.Sigmoid()
             ),
             'cropping': nn.Sequential(
-                nn.Linear(self.hidden_size, 64),
+                nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
-                nn.Linear(64, 1),
+                nn.Dropout(0.1),
+                nn.Linear(256, 1),
                 nn.Sigmoid()
             )
         })
