@@ -31,7 +31,8 @@ class MTLDeepConvLSTMEncoder(nn.Module):
         self.device = args.get('device', 'cpu')
         
         # List of supported tasks
-        self.task_list = ['jitter', 'scaling', 'mag_warp', 'time_warp', 'rotation', 'permutation', 'cropping']
+        self.task_list = ['jitter', 'scaling', 'time_warp', 'rotation', 'permutation', 
+                          'negated', 'horizontal_flip', 'channel_shuffle']
         
         # Task-specific binary classification heads (MTL)
         self.task_heads = nn.ModuleDict({
@@ -43,13 +44,6 @@ class MTLDeepConvLSTMEncoder(nn.Module):
                 nn.Sigmoid()
             ),
             'scaling': nn.Sequential(
-                nn.Linear(self.hidden_size, 256),
-                nn.ReLU(),
-                nn.Dropout(0.1),
-                nn.Linear(256, 1),
-                nn.Sigmoid()
-            ),
-            'mag_warp': nn.Sequential(
                 nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
                 nn.Dropout(0.1),
@@ -77,7 +71,21 @@ class MTLDeepConvLSTMEncoder(nn.Module):
                 nn.Linear(256, 1),
                 nn.Sigmoid()
             ),
-            'cropping': nn.Sequential(
+            'negated': nn.Sequential(
+                nn.Linear(self.hidden_size, 256),
+                nn.ReLU(),
+                nn.Dropout(0.1),
+                nn.Linear(256, 1),
+                nn.Sigmoid()
+            ),
+            'horizontal_flip': nn.Sequential(
+                nn.Linear(self.hidden_size, 256),
+                nn.ReLU(),
+                nn.Dropout(0.1),
+                nn.Linear(256, 1),
+                nn.Sigmoid()
+            ),
+            'channel_shuffle': nn.Sequential(
                 nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
                 nn.Dropout(0.1),

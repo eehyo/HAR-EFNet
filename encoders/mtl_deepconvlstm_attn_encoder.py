@@ -31,7 +31,8 @@ class MTLDeepConvLSTMAttnEncoder(nn.Module):
         self.device = args.get('device', 'cpu')
         
         # List of supported tasks
-        self.task_list = ['jitter', 'scaling', 'mag_warp', 'time_warp', 'rotation', 'permutation', 'cropping']
+        self.task_list = ['jitter', 'scaling', 'time_warp', 'rotation', 'permutation',
+                         'negated', 'horizontal_flip', 'channel_shuffle']
         
         # Task-specific binary classification heads (MTL)
         # TPN : fc layer of 256 hidden units followed by a sigmoidal output layer for binary classication
@@ -50,13 +51,7 @@ class MTLDeepConvLSTMAttnEncoder(nn.Module):
                 nn.Linear(256, 1),
                 nn.Sigmoid()
             ),
-            'mag_warp': nn.Sequential(
-                nn.Linear(self.hidden_size, 256),
-                nn.ReLU(),
-                nn.Dropout(0.1),
-                nn.Linear(256, 1),
-                nn.Sigmoid()
-            ),
+
             'time_warp': nn.Sequential(
                 nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
@@ -78,7 +73,21 @@ class MTLDeepConvLSTMAttnEncoder(nn.Module):
                 nn.Linear(256, 1),
                 nn.Sigmoid()
             ),
-            'cropping': nn.Sequential(
+            'negated': nn.Sequential(
+                nn.Linear(self.hidden_size, 256),
+                nn.ReLU(),
+                nn.Dropout(0.1),
+                nn.Linear(256, 1),
+                nn.Sigmoid()
+            ),
+            'horizontal_flip': nn.Sequential(
+                nn.Linear(self.hidden_size, 256),
+                nn.ReLU(),
+                nn.Dropout(0.1),
+                nn.Linear(256, 1),
+                nn.Sigmoid()
+            ),
+            'channel_shuffle': nn.Sequential(
                 nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
                 nn.Dropout(0.1),

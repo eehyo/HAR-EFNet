@@ -44,11 +44,12 @@ def get_args():
     parser.add_argument('--mtl_mode', default=False, type=str2bool, help='Use MTL SSL pretraining')
     parser.add_argument('--task_weights_jitter', type=float, default=1.0, help='Weight for jitter task')
     parser.add_argument('--task_weights_scaling', type=float, default=1.0, help='Weight for scaling task')
-    parser.add_argument('--task_weights_mag_warp', type=float, default=1.0, help='Weight for magnitude warping task')
     parser.add_argument('--task_weights_time_warp', type=float, default=1.0, help='Weight for time warping task')
     parser.add_argument('--task_weights_rotation', type=float, default=1.0, help='Weight for rotation task')
     parser.add_argument('--task_weights_permutation', type=float, default=1.0, help='Weight for permutation task')
-    parser.add_argument('--task_weights_cropping', type=float, default=1.0, help='Weight for cropping task')
+    parser.add_argument('--task_weights_negated', type=float, default=1.0, help='Weight for negation task')
+    parser.add_argument('--task_weights_horizontal_flip', type=float, default=1.0, help='Weight for horizontal flip task')
+    parser.add_argument('--task_weights_channel_shuffle', type=float, default=1.0, help='Weight for channel shuffle task')
     
     args = parser.parse_args()
     
@@ -56,11 +57,12 @@ def get_args():
     args.task_weights = {
         'jitter': args.task_weights_jitter,
         'scaling': args.task_weights_scaling,
-        'mag_warp': args.task_weights_mag_warp,
         'time_warp': args.task_weights_time_warp,
         'rotation': args.task_weights_rotation,
         'permutation': args.task_weights_permutation,
-        'cropping': args.task_weights_cropping
+        'negated': args.task_weights_negated,
+        'horizontal_flip': args.task_weights_horizontal_flip,
+        'channel_shuffle': args.task_weights_channel_shuffle,
     }
         
     # data config

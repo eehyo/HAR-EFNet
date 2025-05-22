@@ -9,8 +9,8 @@ from typing import Tuple, Dict, List, Optional, Any, Union, Callable
 
 from encoders import MTLDeepConvLSTMEncoder, MTLDeepConvLSTMAttnEncoder, MTLSAHAREncoder
 from dataloaders.data_transformations import (
-    DA_Jitter, DA_Scaling, DA_MagnitudeWarp, DA_TimeWarp, 
-    DA_Permutation, DA_Rotation_per_sensor, DA_Cropping
+    DA_Jitter, DA_Scaling, DA_TimeWarp, 
+    DA_Permutation, DA_Rotation_per_sensor, DA_Negated, DA_HorizontalFlip, DA_ChannelShuffle
 )
 from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
 from utils.logger import Logger
@@ -47,6 +47,20 @@ class MTLEncoderTrainer:
         
         # Task-specific weights
         self.task_weights = args.task_weights
+        
+        # Validate that all transformation functions have corresponding weights
+        for task_name in self.task_names:
+            if task_name not in self.task_weights:
+                self.logger.warning(f"Missing weight for transformation task '{task_name}'. Using default weight 1.0.")
+                self.task_weights[task_name] = 1.0
+        
+        # Validate that all weights have corresponding transformation functions
+        for task_name in self.task_weights:
+            if task_name not in self.transform_funcs:
+                self.logger.warning(f"Weight specified for '{task_name}' but no transformation function found. This weight will be ignored.")
+        
+        self.logger.info(f"Using transformations: {sorted(self.task_names)}")
+        self.logger.info(f"Task weights: {self.task_weights}")
         
         # Loss function: BCE Loss for binary classification
         self.criterion = nn.BCELoss()
@@ -377,33 +391,27 @@ def get_transform_functions() -> Dict[str, Callable]:
         Dictionary of transformation functions {task_name: transform_function}
     """
     # Define arguments for warping transformations
-    mag_warp_args = {'sigma': 0.2, 'knot': 4}
-    time_warp_args = {'sigma': 0.2}
+    time_warp_args = {'sigma': 0.2, 'knot': 4}
     permutation_args = {'nPerm': 4, 'minSegLength': 10}
-    cropping_args = {'crop_size': 100}
     
-    # Wrap each transformation function with fixed arguments
-    def mag_warp_func(x):
-        return DA_MagnitudeWarp(x, **mag_warp_args)
-    
-    def time_warp_func(x):
-        return DA_TimeWarp(x, **time_warp_args)
-    
-    def permutation_func(x):
-        return DA_Permutation(x, **permutation_args)
-    
-    def cropping_func(x):
-        return DA_Cropping(x, **cropping_args)
+    # 센서 데이터 형식에 대한 검증이 필요한 rotation 함수만 래퍼로 유지
+    def rotation_func(x):
+        try:
+            return DA_Rotation_per_sensor(x)
+        except Exception as e:
+            print(f"Error applying rotation transformation: {str(e)}, input shape: {x.shape}")
+            raise
     
     # Construct transformation functions dictionary
     transform_funcs = {
         'jitter': lambda x: DA_Jitter(x, sigma=0.05),
         'scaling': lambda x: DA_Scaling(x, sigma=0.1),
-        'mag_warp': mag_warp_func,
-        'time_warp': time_warp_func,
-        'rotation': DA_Rotation_per_sensor,
-        'permutation': permutation_func,
-        'cropping': cropping_func
+        'time_warp': lambda x: DA_TimeWarp(x, **time_warp_args),
+        'rotation': rotation_func,
+        'permutation': lambda x: DA_Permutation(x, **permutation_args),
+        'negated': DA_Negated,
+        'horizontal_flip': DA_HorizontalFlip,
+        'channel_shuffle': DA_ChannelShuffle
     }
     
     return transform_funcs 
