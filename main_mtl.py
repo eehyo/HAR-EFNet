@@ -8,8 +8,8 @@ from dataloaders.data_loader import PAMAP2, get_data
 from utils.training_utils import set_seed, save_results_summary
 from utils.logger import Logger
 
-from train_encoder_mtl import create_mtl_encoder, load_pretrained_mtl_encoder, MTLEncoderTrainer, get_transform_functions
-from train_classifier import create_classifier, ClassifierTrainer, evaluate_classifier
+from train.train_encoder_mtl import create_mtl_encoder, load_pretrained_mtl_encoder, MTLEncoderTrainer, get_transform_functions
+from train.train_classifier import create_classifier, ClassifierTrainer, evaluate_classifier
 
 if __name__ == '__main__': 
     args = get_args()

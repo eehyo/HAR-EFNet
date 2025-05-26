@@ -3,35 +3,36 @@ import torch.nn as nn
 import numpy as np
 from typing import Dict, Any, Tuple, Optional, List, Union
 
-from .sa_har_encoder import SAHAREncoder
+from ..base.deepconvlstm_encoder import DeepConvLSTMEncoder
 
 
-class MTLSAHAREncoder(nn.Module):
+class MTLDeepConvLSTMEncoder(nn.Module):
     """
-    Multi-Task Learning SA-HAR Encoder class
-    Adds MTL heads for Self-Supervised Learning based on the existing SA-HAR encoder
+    Multi-Task Learning DeepConvLSTM Encoder class
+    Adds MTL heads for Self-Supervised Learning based on the existing DeepConvLSTM encoder
     Performs binary classification tasks in parallel to predict each transformation (augmentation) type
     """
     def __init__(self, args: Dict[str, Any]):
         """
-        Initialize MTL SA-HAR encoder
+        Initialize MTL DeepConvLSTM encoder
         
         Args:
             args: Model configuration parameters (Dict)
         """
-        super(MTLSAHAREncoder, self).__init__()
+        super(MTLDeepConvLSTMEncoder, self).__init__()
         
         # Configure base encoder
-        self.encoder = SAHAREncoder(args)
+        self.encoder = DeepConvLSTMEncoder(args)
         
+        # LSTM output size (hidden_dim set in DeepConvLSTM)
         self.hidden_size = self.encoder.embedding_dim
         
         # Device configuration
         self.device = args.get('device', 'cpu')
         
         # List of supported tasks
-        self.task_list = ['jitter', 'scaling', 'time_warp', 'rotation', 'permutation',
-                         'negated', 'horizontal_flip', 'channel_shuffle']
+        self.task_list = ['jitter', 'scaling', 'time_warp', 'rotation', 'permutation', 
+                          'negated', 'horizontal_flip', 'channel_shuffle']
         
         # Task-specific binary classification heads (MTL)
         self.task_heads = nn.ModuleDict({
@@ -146,15 +147,14 @@ class MTLSAHAREncoder(nn.Module):
         Returns:
             Encoded feature vector [batch_size, hidden_size]
         """
-        return self.encoder.extract_features(x)
-    
+        return self.encoder.extract_features(x) 
+        
     def freeze_all(self):
         """
         Freeze all encoder parameters including base encoder and MTL heads
         """
         # Freeze base encoder
-        for param in self.encoder.parameters():
-            param.requires_grad = False
+        self.encoder.freeze_all()
         
         # Freeze MTL heads
         for head in self.task_heads.values():
@@ -166,8 +166,7 @@ class MTLSAHAREncoder(nn.Module):
         Unfreeze all encoder parameters for full fine-tuning
         """
         # Unfreeze base encoder
-        for param in self.encoder.parameters():
-            param.requires_grad = True
+        self.encoder.unfreeze_all()
         
         # Unfreeze MTL heads
         for head in self.task_heads.values():

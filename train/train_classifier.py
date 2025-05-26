@@ -234,7 +234,7 @@ def create_classifier(args: Any, encoder: nn.Module) -> nn.Module:
     logger = Logger("classifier_creator")
     
     # Load model configuration - use relative path for flexibility
-    config_path = os.path.join(os.path.dirname(__file__), 'configs', 'model.yaml')
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'configs', 'model.yaml')
     with open(config_path, mode='r') as config_file:
         model_config = yaml.load(config_file, Loader=yaml.FullLoader)
     

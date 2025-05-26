@@ -3,38 +3,39 @@ import torch.nn as nn
 import numpy as np
 from typing import Dict, Any, Tuple, Optional, List, Union
 
-from .deepconvlstm_encoder import DeepConvLSTMEncoder
+from ..base.deepconvlstm_attn_encoder import DeepConvLSTMAttnEncoder
 
 
-class MTLDeepConvLSTMEncoder(nn.Module):
+class MTLDeepConvLSTMAttnEncoder(nn.Module):
     """
-    Multi-Task Learning DeepConvLSTM Encoder class
-    Adds MTL heads for Self-Supervised Learning based on the existing DeepConvLSTM encoder
+    Multi-Task Learning DeepConvLSTM with Attention Encoder class
+    Adds MTL heads for Self-Supervised Learning based on the existing DeepConvLSTM+Attention encoder
     Performs binary classification tasks in parallel to predict each transformation (augmentation) type
     """
     def __init__(self, args: Dict[str, Any]):
         """
-        Initialize MTL DeepConvLSTM encoder
+        Initialize MTL DeepConvLSTM with Attention encoder
         
         Args:
             args: Model configuration parameters (Dict)
         """
-        super(MTLDeepConvLSTMEncoder, self).__init__()
+        super(MTLDeepConvLSTMAttnEncoder, self).__init__()
         
         # Configure base encoder
-        self.encoder = DeepConvLSTMEncoder(args)
+        self.encoder = DeepConvLSTMAttnEncoder(args)
         
-        # LSTM output size (hidden_dim set in DeepConvLSTM)
+        # LSTM output size (size after Attention combination)
         self.hidden_size = self.encoder.embedding_dim
         
         # Device configuration
         self.device = args.get('device', 'cpu')
         
         # List of supported tasks
-        self.task_list = ['jitter', 'scaling', 'time_warp', 'rotation', 'permutation', 
-                          'negated', 'horizontal_flip', 'channel_shuffle']
+        self.task_list = ['jitter', 'scaling', 'time_warp', 'rotation', 'permutation',
+                         'negated', 'horizontal_flip', 'channel_shuffle']
         
         # Task-specific binary classification heads (MTL)
+        # TPN : fc layer of 256 hidden units followed by a sigmoidal output layer for binary classication
         self.task_heads = nn.ModuleDict({
             'jitter': nn.Sequential(
                 nn.Linear(self.hidden_size, 256),
@@ -50,6 +51,7 @@ class MTLDeepConvLSTMEncoder(nn.Module):
                 nn.Linear(256, 1),
                 nn.Sigmoid()
             ),
+
             'time_warp': nn.Sequential(
                 nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
@@ -121,7 +123,7 @@ class MTLDeepConvLSTMEncoder(nn.Module):
             Otherwise returns outputs of all tasks as a dict
         """
         # Get encoder output
-        encoder_output = self.encoder.extract_features(x)  # [batch_size, hidden_size]
+        encoder_output = self.encoder.extract_features(x)  # [batch_size, attention_size]
         
         # When in specific task mode
         if task is not None:
@@ -145,9 +147,17 @@ class MTLDeepConvLSTMEncoder(nn.Module):
             x: Input time series data [batch_size, window_size, channels]
             
         Returns:
-            Encoded feature vector [batch_size, hidden_size]
+            Encoded feature vector [batch_size, attention_size]
         """
         return self.encoder.extract_features(x) 
+    
+    def freeze_cnn_lstm_only(self):
+        """
+        Freeze only CNN and LSTM layers while keeping attention layers trainable
+        Delegates to base encoder's implementation
+        """
+        # Use base encoder's method
+        self.encoder.freeze_cnn_lstm_only()
         
     def freeze_all(self):
         """
