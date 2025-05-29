@@ -29,7 +29,7 @@ class EncoderTrainer:
             save_path: model save path
         """
         self.model = model
-        self.device = torch.device("cuda" if args.use_gpu else "cpu")
+        self.device = args.device
         self.model.to(self.device)
         
         # Initialize logger

@@ -22,6 +22,8 @@ if __name__ == '__main__':
     args.timestamp = timestamp
     
     logger = Logger(f"mtl_{args.encoder_type}_{args.classifier_type}")
+    print(torch.cuda.current_device())  
+    print(torch.cuda.get_device_name(torch.cuda.current_device()))  
 
     # Random Seed
     set_seed(args.seed)

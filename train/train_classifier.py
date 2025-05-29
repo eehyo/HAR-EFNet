@@ -34,7 +34,7 @@ class ClassifierTrainer:
             save_path: Path to save model
         """
         self.model = model
-        self.device = torch.device("cuda" if args.use_gpu else "cpu")
+        self.device = args.device
         self.model.to(self.device)
         
         # Initialize logger
@@ -295,7 +295,7 @@ def evaluate_classifier(args: Any, model: nn.Module, test_loader: DataLoader,
     logger.info("Testing classifier...")
     logger.info(f"Test Subject: {args.test_subject} (Fold {args.fold_idx})")
     
-    device = torch.device("cuda" if args.use_gpu else "cpu")
+    device = args.device
     model.to(device)
     model.eval()
     

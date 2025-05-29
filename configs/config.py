@@ -19,9 +19,9 @@ def get_args():
     # Dataset
     parser.add_argument('-d', '--data_name', default='pamap2', type=str, help='Name of the Dataset')    
     # Model
-    parser.add_argument('-e', '--encoder_type', default='deepconvlstm', type=str, 
+    parser.add_argument('-e', '--encoder_type', default='deepconvlstm_attn', type=str, 
                          help='Encoder Type (deepconvlstm, deepconvlstm_attn, sa_har)')
-    parser.add_argument('-c', '--classifier_type', default='deepconvlstm_classifier', type=str, 
+    parser.add_argument('-c', '--classifier_type', default='deepconvlstm_attn_classifier', type=str, 
                          help='Classifier Type (deepconvlstm_classifier, deepconvlstm_attn_classifier, sa_har_classifier). If not specified, will auto-select based on encoder type.')
     
     # Training mode settings
@@ -80,11 +80,11 @@ def get_args():
     # GPU settings
     args.use_gpu = True if torch.cuda.is_available() else False
     args.use_multi_gpu = True
-    args.gpu = 3
+    args.gpu = 5
     args.devices = "0,1,2,3,4,5,6,7"
     
     if args.use_gpu:
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu) if not args.use_multi_gpu else args.devices
+        os.environ["CUDA_VISIBLE_DEVICES"] = args.devices
         args.device = torch.device(f'cuda:{args.gpu}')
         print(f'Device: GPU, cuda:{args.gpu}')
     else:
@@ -98,8 +98,8 @@ def get_args():
     
     # training settings
     # mtl: maximum of 30 epochs with a learning rate of 0.0003
-    args.train_epochs = 30
-    args.learning_rate = 0.0003 # 0.0005
+    args.train_epochs = 300
+    args.learning_rate = 0.0005 # 0.0003 
     args.weight_decay = 0.0001  # mtl weight decay
     args.learning_rate_patience = 7
     args.learning_rate_factor = 0.1
@@ -110,7 +110,7 @@ def get_args():
     args.train_vali_quote = 0.90
 
     args.classifier_lr = 0.0001
-    args.classifier_epochs = 30
+    args.classifier_epochs = 300
     args.classifier_batch_size = 256
     args.freeze_encoder = True  # Freeze
     

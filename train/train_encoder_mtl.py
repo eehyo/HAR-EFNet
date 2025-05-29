@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 from typing import Tuple, Dict, List, Optional, Any, Union, Callable
 
 from encoders import MTLDeepConvLSTMEncoder, MTLDeepConvLSTMAttnEncoder, MTLSAHAREncoder
-from dataloaders.data_transformations import (
+from dataloaders.mtl_transformations import (
     DA_Jitter, DA_Scaling, DA_TimeWarp, 
     DA_Permutation, DA_Rotation_per_sensor, DA_Negated, DA_HorizontalFlip, DA_ChannelShuffle
 )
@@ -34,7 +34,7 @@ class MTLEncoderTrainer:
             save_path: Model save path
         """
         self.model = model
-        self.device = torch.device("cuda" if args.use_gpu else "cpu")
+        self.device = args.device
         self.model.to(self.device)
         
         # Initialize Logger
