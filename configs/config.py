@@ -50,6 +50,14 @@ def get_args():
     parser.add_argument('--task_weights_negated', type=float, default=1.0, help='Weight for negation task')
     parser.add_argument('--task_weights_horizontal_flip', type=float, default=1.0, help='Weight for horizontal flip task')
     parser.add_argument('--task_weights_channel_shuffle', type=float, default=1.0, help='Weight for channel shuffle task')
+
+    # SimCLR pretraining settings
+    parser.add_argument('--simclr_mode', default=False, type=str2bool, help='Use SimCLR SSL pretraining')
+    parser.add_argument('--temperature', type=float, default=0.1, help='Temperature parameter for NT-Xent loss')
+    parser.add_argument('--projection_dim', type=int, default=256, help='Projection head output dimension')
+    parser.add_argument('--projection_hidden_dim', type=int, default=512, help='Projection head hidden dimension')
+    parser.add_argument('--validation_mode', type=str, default='random', choices=['random', 'combinations'], 
+                        help='Validation mode for SimCLR (random: random transform pairs, combinations: all combinations)')
     
     args = parser.parse_args()
     
