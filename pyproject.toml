@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Human Activity Recognition Encoder Training with Self-Supervised Learning"
 authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
-packages = [{include = "encoder_training"}]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.13"

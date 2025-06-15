@@ -9,7 +9,7 @@ from ..base.deepconvlstm_encoder import DeepConvLSTMEncoder
 class SimCLRDeepConvLSTMEncoder(nn.Module):
     """
     SimCLR DeepConvLSTM Encoder class
-    기존 DeepConvLSTM encoder에 projection head를 추가하여 contrastive learning을 수행
+    Add projection head to the existing DeepConvLSTM encoder for contrastive learning
     """
     def __init__(self, args: Dict[str, Any]):
         """
@@ -20,25 +20,28 @@ class SimCLRDeepConvLSTMEncoder(nn.Module):
         """
         super(SimCLRDeepConvLSTMEncoder, self).__init__()
         
-        # Base encoder 설정
+        # Configure base encoder
         self.encoder = DeepConvLSTMEncoder(args)
         
-        # Encoder의 embedding dimension
+        # LSTM output size (hidden_dim set in DeepConvLSTM)
         self.hidden_size = self.encoder.embedding_dim
         
         # Device configuration
         self.device = args.get('device', 'cpu')
         
         # SimCLR projection head parameters
-        self.projection_dim = args.get('projection_dim', 256)
-        self.projection_hidden_dim = args.get('projection_hidden_dim', 512)
+        self.projection_hidden_dim1 = args.get('projection_hidden_dim1', 256)  
+        self.projection_hidden_dim2 = args.get('projection_hidden_dim2', 128) 
+        self.projection_dim = args.get('projection_dim', 50) 
         
         # Projection head for SimCLR
         # f(.) -> g(.) projection
         self.projection_head = nn.Sequential(
-            nn.Linear(self.hidden_size, self.projection_hidden_dim),
+            nn.Linear(self.hidden_size, self.projection_hidden_dim1),
             nn.ReLU(),
-            nn.Linear(self.projection_hidden_dim, self.projection_dim)
+            nn.Linear(self.projection_hidden_dim1, self.projection_hidden_dim2),
+            nn.ReLU(),
+            nn.Linear(self.projection_hidden_dim2, self.projection_dim)
         )
         
         # Initialize weights
