@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+LAYER_TYPE = 'single'  # 'single' or '2layer'
+
 class DeepConvLSTMAttnClassifier(nn.Module):
     """
     Uses the encoder's internal attention mechanism and applies a simple FC layer for classification
@@ -9,17 +11,46 @@ class DeepConvLSTMAttnClassifier(nn.Module):
     def __init__(self, encoder, num_classes, config):
         super(DeepConvLSTMAttnClassifier, self).__init__()
         
-        # Encoder setup
         self.encoder = encoder
-    
-        # FC layer for classification
+
+        self.dropout_rate = config.get('dropout_rate', 0.5)
+        self.hidden_dim = config.get('hidden_dim', 64)
+        self.layer_type = LAYER_TYPE 
+        
+        # Single-layer classification model
+        self.dropout = nn.Dropout(self.dropout_rate)
         self.fc = nn.Linear(encoder.get_embedding_dim(), num_classes)
-        
+
+        # 2-layer classification model
+        self.fc1 = nn.Linear(encoder.get_embedding_dim(), self.hidden_dim)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(self.hidden_dim, num_classes)
+
     def forward(self, x):
-        # Extract features using encoder's internal attention mechanism
-        features = self.encoder.extract_features(x)
+        # extract features from encoder
+        features = self.encoder.extract_features(x) # (batch_size, embedding_dim)
         
-        output = self.fc(features)
+        if self.layer_type == 'single':
+            # Single-layer classification model  
+            # apply dropout
+            features = self.dropout(features) # (batch_size, embedding_dim)
+            
+            # linear classifier for class prediction
+            output = self.fc(features) # (batch_size, num_classes)
+            
+        elif self.layer_type == '2layer':
+            # 2-layer classification model
+            # first FC layer
+            x = self.fc1(features) # (batch_size, hidden_dim)
+            x = self.relu(x)
+            x = self.dropout(x)
+            
+            # second FC layer for class prediction
+            output = self.fc2(x) # (batch_size, num_classes)
+            
+        else:
+            raise ValueError(f"Unsupported layer_type: {self.layer_type}. "
+                           "Available types: 'single', '2layer'")
         
         return output
     

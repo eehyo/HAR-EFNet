@@ -30,10 +30,11 @@ efnet_classifier:
     
   deepconvlstm_classifier:
     dropout_rate: 0.5
+    hidden_dim: 64
 
   deepconvlstm_attn_classifier:
     dropout_rate: 0.5
-    hidden_size: 128
+    hidden_dim: 64
     
   sa_har_classifier:
-    dropout_rate: 0.2 
+    dropout_rate: 0.2

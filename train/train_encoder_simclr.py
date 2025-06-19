@@ -262,8 +262,9 @@ def create_simclr_encoder(args: Any) -> nn.Module:
         'window_size': args.window_size,
         'output_size': args.output_size,  # (3, 78)
         'device': args.device,
-        'projection_dim': getattr(args, 'projection_dim', 256),
-        'projection_hidden_dim': getattr(args, 'projection_hidden_dim', 512)
+        'projection_dim': getattr(args, 'projection_dim', 50),
+        'projection_hidden_dim1': getattr(args, 'projection_hidden_dim1', 256),
+        'projection_hidden_dim2': getattr(args, 'projection_hidden_dim2', 128)
     }
     
     # Load model configuration
