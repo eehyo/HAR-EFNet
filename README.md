@@ -15,51 +15,6 @@ After training, the encoder is frozen and used as a feature extractor. A lightwe
 ---
 
 
-## Project Structure
-```
-HAR-EFNet/
-├── configs/                
-│   ├── config.py           
-│   ├── model.yaml          
-│   └── data.yaml
-├── dataloaders/            
-│   ├── data_loader.py      
-│   └── data_utils.py       
-├── encoders/              
-│   ├── __init__.py         
-│   ├── base.py
-│   ├── deepconvlstm_attn_encoder.py
-│   ├── deepconvlstm_encoder.py
-│   └── sa_har_encoder.py   
-├── classifiers/  
-│   ├── __init__.py      
-│   ├── deepconvlstm_attn_classifier.py   
-│   ├── deepconvlstm_classifier.py           
-│   └── sa_har_classifier.py  
-├── utils/                  
-│   ├── __init__.py         
-│   ├── training_utils.py   
-│   └── logger.py           
-├── main.py                 
-├── train_encoder.py        
-└── train_classifier.py
-```
-
-Additional directories created during execution:
-```
-HAR-EFNet/
-├── logs/
-│   ├── debug/ 
-│   └── training/
-└── saved/
-    ├── encoders/
-    ├── classifiers/
-    └── results/
-```
-
----
-
-
 ## Installation
 Install the dependencies using Poetry:
 ```bash
