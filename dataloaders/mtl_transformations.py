@@ -174,6 +174,7 @@ def DA_TimeWarp(X, sigma=0.2, knot=4):
 
 # 8. Channel-Shuffled
 # Shuffles the order of channels (feature dimensions)
+# TODO: simclr처럼 센서별로 독립적인 채널 셔플 고려해보기
 def DA_ChannelShuffle(X):
     """
     Randomly shuffles the channels (columns) of the signal.
