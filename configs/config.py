@@ -59,6 +59,11 @@ def get_args():
     parser.add_argument('--validation_mode', type=str, default='random', choices=['random', 'combinations'], 
                         help='Validation mode for SimCLR (random: random transform pairs, combinations: all combinations)')
     
+    # SimCLR transformation functions
+    parser.add_argument('--transform_funcs', nargs='+', 
+                        default=['scaling_transform_vectorized', 'rotation_transform_vectorized'],
+                        help='List of transformation function names to use for SimCLR')
+    
     args = parser.parse_args()
     
     # MTL task weights

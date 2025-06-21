@@ -22,14 +22,15 @@ if __name__ == '__main__':
     args.timestamp = timestamp
     
     logger = Logger(f"simclr_{args.encoder_type}_{args.classifier_type}")
-    print(torch.cuda.current_device())  # 현재 선택된 GPU index
-    print(torch.cuda.get_device_name(torch.cuda.current_device()))  # GPU 이름
+    print(torch.cuda.current_device()) 
+    print(torch.cuda.get_device_name(torch.cuda.current_device()))  
 
     # Random Seed
     set_seed(args.seed)
     logger.info(f"Random Seed: {args.seed}")
     logger.info(f"Using SimCLR encoder type: {args.encoder_type}, classifier type: {args.classifier_type}")
     logger.info(f"SimCLR parameters: temperature={args.temperature}, projection_dim={args.projection_dim}")
+    logger.info(f"SimCLR transformation functions: {args.transform_funcs}")
 
     # Load dataset
     dataset = PAMAP2(args)
@@ -97,6 +98,7 @@ if __name__ == '__main__':
             f.write(f"Classifier Type: {args.classifier_type}\n")
             f.write(f"Temperature: {args.temperature}\n")
             f.write(f"Projection Dim: {args.projection_dim}\n")
+            f.write(f"Transformation Functions: {args.transform_funcs}\n")
             f.write(f"Weight Decay: {args.weight_decay}\n")
             f.write(f"Timestamp: {timestamp}\n")
             f.write(f"Run ID: {run_id}\n")

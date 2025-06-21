@@ -9,7 +9,7 @@ from typing import Tuple, Dict, List, Optional, Any, Union
 import itertools
 
 from encoders import SimCLRDeepConvLSTMEncoder, SimCLRDeepConvLSTMAttnEncoder, SimCLRSAHAREncoder
-from dataloaders.simclr_transformations import apply_random_transform_pair, apply_transform_combinations
+from utils.simclr_utils import create_simclr_transformation_function, generate_contrastive_views_batch
 from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
 from utils.logger import Logger
 from lightly.loss import NTXentLoss
@@ -71,48 +71,31 @@ class SimCLREncoderTrainer:
         self.early_stopping = EarlyStopping(patience=args.early_stop_patience, verbose=True, 
                                            logger_name=f"es_simclr_{args.encoder_type}")
         
-        # Validation mode: 'random' or 'combinations'
-        self.validation_mode = getattr(args, 'validation_mode', 'random')
+        # Create transformation function from args
+        self.transform_funcs = getattr(args, 'transform_funcs', ['scaling_transform_vectorized', 'rotation_transform_vectorized'])
+        self.transformation_function = create_simclr_transformation_function(self.transform_funcs)
         
-    def generate_contrastive_pairs(self, batch_x: torch.Tensor, mode: str = 'random') -> Tuple[torch.Tensor, torch.Tensor]:
+        self.logger.info(f"Using transformation functions: {self.transform_funcs}")
+        
+    def generate_contrastive_pairs(self, batch_x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Generate contrastive pairs from input batch
+        Generate contrastive pairs from input batch using vectorized transformations
         
         Args:
             batch_x: Original input data [batch_size, window_size, channels]
-            mode: 'random' for random transformation pairs, 'combinations' for all combinations
             
         Returns:
             Tuple of (view1, view2) tensors
         """
-        batch_size = batch_x.shape[0]
-        view1_list = []
-        view2_list = []
-        
-        for i in range(batch_size):
-            x_np = batch_x[i].cpu().numpy()  # [window_size, channels]
+        # Convert to numpy for vectorized transformations
+        batch_np = batch_x.cpu().numpy()  # [batch_size, window_size, channels]
             
-            if mode == 'random':
-                # Apply random transformation pair
-                x1, x2 = apply_random_transform_pair(x_np)
-                view1_list.append(x1)
-                view2_list.append(x2)
-            else:
-                # For validation, use first transformation combination
-                pairs = apply_transform_combinations(x_np)
-                if pairs:
-                    x1, x2 = pairs[0]  # Use first combination
-                    view1_list.append(x1)
-                    view2_list.append(x2)
-                else:
-                    # Fallback to random if no pairs available
-                    x1, x2 = apply_random_transform_pair(x_np)
-                    view1_list.append(x1)
-                    view2_list.append(x2)
+        # Generate two views using vectorized transformation
+        view1_np, view2_np = generate_contrastive_views_batch(batch_np, self.transformation_function)
         
-        # Convert to tensors
-        view1 = torch.tensor(np.stack(view1_list), dtype=torch.float32).to(self.device)
-        view2 = torch.tensor(np.stack(view2_list), dtype=torch.float32).to(self.device)
+        # Convert back to tensors
+        view1 = torch.tensor(view1_np, dtype=torch.float32).to(self.device)
+        view2 = torch.tensor(view2_np, dtype=torch.float32).to(self.device)
         
         return view1, view2
     
@@ -138,8 +121,8 @@ class SimCLREncoderTrainer:
             # Prepare original data
             batch_x = batch_x.float().to(self.device)
             
-            # Generate contrastive pairs
-            view1, view2 = self.generate_contrastive_pairs(batch_x, mode='random')
+            # Generate contrastive pairs using vectorized transformation
+            view1, view2 = self.generate_contrastive_pairs(batch_x)
             
             # Forward pass
             self.optimizer.zero_grad()
@@ -168,7 +151,7 @@ class SimCLREncoderTrainer:
     
     def validate(self, valid_loader: DataLoader) -> float:
         """
-        Validate model
+        Validate model using same transformation pipeline as training
         
         Args:
             valid_loader: Validation data loader
@@ -187,8 +170,8 @@ class SimCLREncoderTrainer:
                 
                 batch_x = batch_x.float().to(self.device)
                 
-                # Generate contrastive pairs for validation
-                view1, view2 = self.generate_contrastive_pairs(batch_x, mode=self.validation_mode)
+                # Generate contrastive pairs using same transformation pipeline as training
+                view1, view2 = self.generate_contrastive_pairs(batch_x)
                 
                 # Forward pass
                 z1 = self.model(view1)
@@ -216,6 +199,7 @@ class SimCLREncoderTrainer:
         """
         self.logger.info(f"Starting SimCLR encoder training, saving to: {self.save_path}")
         self.logger.info(f"Using temperature: {self.temperature}")
+        self.logger.info(f"Using transformation functions: {self.transform_funcs}")
         
         for epoch in range(self.epochs):
             # Training phase
