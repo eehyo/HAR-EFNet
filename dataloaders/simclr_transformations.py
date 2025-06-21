@@ -86,20 +86,37 @@ def axangle2mat(axis, angle, is_normalized = False) -> np.ndarray:
             [ xyC+zs,   y*yC+c,   yzC-xs ],
             [ zxC-ys,   yzC+xs,   z*zC+c ]])
 
-# 4. Negation
-def negate_transform_vectorized(X: np.ndarray) -> np.ndarray:
-    """
-    Inverting the signals
-    """
-    return X * -1
+# # 4. Negation
+# def negate_transform_vectorized(X: np.ndarray) -> np.ndarray:
+#     """
+#     Inverting the signals
+#     """
+#     return X * -1
 
-# 5. Time Flip
-def time_flip_transform_vectorized(X: np.ndarray) -> np.ndarray:
+# 4-1. Negation (probabilistic)
+def negate_transform_vectorized(X: np.ndarray, p: float = 0.5) -> np.ndarray:
     """
-    Reversing the direction of time
+    With probability p, invert the signals; otherwise return X unchanged.
     """
-    return X[:, ::-1, :]
+    if np.random.rand() < p:
+        return -X
+    return X
 
+# # 5. Time Flip
+# def time_flip_transform_vectorized(X: np.ndarray) -> np.ndarray:
+#     """
+#     Reversing the direction of time
+#     """
+#     return X[:, ::-1, :]
+
+# 5-1. Time Flip (probabilistic)
+def time_flip_transform_vectorized(X: np.ndarray, p: float = 0.5) -> np.ndarray:
+    """
+    With probability p, reverse the time dimension; otherwise return X unchanged.
+    """
+    if np.random.rand() < p:
+        return X[:, ::-1, :]
+    return X
 
 # 6. Channel Shuffle
 def channel_shuffle_transform_vectorized(X: np.ndarray) -> np.ndarray:
