@@ -96,34 +96,39 @@ class MTLEncoderTrainer:
         B, T, C = batch_x.shape
         task_num = len(self.task_names)
         
-        # Lists to store augmented data and labels
-        X_aug = []  # [B, num_tasks, T, C]
-        Y = []      # [B, num_tasks]
-
-        # Apply transformations for each sample
-        # [B, T, C] -> [T, C]
-        for x in batch_x:
-            x_np = x.cpu().numpy()  # [168, 9]
-            x_aug = []
-            y_bin = []
+        # Convert to numpy for batch processing
+        batch_np = batch_x.cpu().numpy()  # [B, T, C]
+        
+        # Initialize arrays for augmented data and labels
+        X_aug = np.zeros((B, task_num, T, C), dtype=np.float32)  # [B, num_tasks, T, C]
+        Y = np.zeros((B, task_num), dtype=np.float32)            # [B, num_tasks]
+        
+        # Apply each transformation to the entire batch
+        for t_idx, tname in enumerate(self.task_names):
+            # Get transformation function
+            tfunc = self.transform_funcs[tname]
             
-            # Apply each transformation with 50% probability
-            for tname, tfunc in self.transform_funcs.items():
-                if np.random.rand() < 0.5:
-                    x_t = tfunc(x_np.copy())  # Apply transformation
-                    y_bin.append(1)  # Transformation applied
-                else:
-                    x_t = x_np.copy()  # Keep original
-                    y_bin.append(0)  # Transformation not applied
-                    
-                x_aug.append(x_t)
-                
-            X_aug.append(np.stack(x_aug))   # [num_tasks, T, C]
-            Y.append(y_bin)                 # [num_tasks]
-
+            # Generate random mask for each sample in batch (50% probability)
+            apply_mask = np.random.rand(B) < 0.5  # [B]
+            
+            # Create a copy of the original batch for this task
+            task_batch = batch_np.copy()  # [B, T, C]
+            
+            # Apply transformation to samples where mask is True
+            if np.any(apply_mask):
+                # Apply transformation to selected samples in batch
+                samples_to_transform = task_batch[apply_mask]  # [num_selected, T, C]
+                if samples_to_transform.shape[0] > 0:
+                    transformed_samples = tfunc(samples_to_transform)  # [num_selected, T, C]
+                    task_batch[apply_mask] = transformed_samples
+            
+            # Store the augmented data and labels
+            X_aug[:, t_idx] = task_batch  # [B, T, C]
+            Y[:, t_idx] = apply_mask.astype(np.float32)  # [B] - 1 if transformed, 0 if not
+        
         # Convert numpy -> torch and move to device
-        X_aug = torch.tensor(np.array(X_aug), dtype=torch.float32).to(self.device)  # [B, num_tasks, T, C]
-        Y = torch.tensor(np.array(Y), dtype=torch.float32).to(self.device)          # [B, num_tasks]
+        X_aug = torch.tensor(X_aug, dtype=torch.float32).to(self.device)  # [B, num_tasks, T, C]
+        Y = torch.tensor(Y, dtype=torch.float32).to(self.device)          # [B, num_tasks]
         
         return X_aug, Y
     
@@ -394,7 +399,6 @@ def get_transform_functions() -> Dict[str, Callable]:
     time_warp_args = {'sigma': 0.2, 'knot': 4}
     permutation_args = {'nPerm': 4, 'minSegLength': 10}
     
-    # 센서 데이터 형식에 대한 검증이 필요한 rotation 함수만 래퍼로 유지
     def rotation_func(x):
         try:
             return DA_Rotation_per_sensor(x)
