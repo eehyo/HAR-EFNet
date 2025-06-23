@@ -54,14 +54,14 @@ def get_args():
     # SimCLR pretraining settings
     parser.add_argument('--simclr_mode', default=False, type=str2bool, help='Use SimCLR SSL pretraining')
     parser.add_argument('--temperature', type=float, default=0.1, help='Temperature parameter for NT-Xent loss')
-    parser.add_argument('--projection_dim', type=int, default=256, help='Projection head output dimension')
-    parser.add_argument('--projection_hidden_dim', type=int, default=512, help='Projection head hidden dimension')
-    parser.add_argument('--validation_mode', type=str, default='random', choices=['random', 'combinations'], 
-                        help='Validation mode for SimCLR (random: random transform pairs, combinations: all combinations)')
+    parser.add_argument('--projection_dim', type=int, default=50, help='Projection head output dimension')
+    parser.add_argument('--projection_hidden_dim1', type=int, default=256, help='Projection head first hidden dimension')
+    parser.add_argument('--projection_hidden_dim2', type=int, default=128, help='Projection head second hidden dimension')
+
     
     # SimCLR transformation functions
     parser.add_argument('--transform_funcs', nargs='+', 
-                        default=['scaling_transform_vectorized', 'rotation_transform_vectorized'],
+                        default=['channel_shuffle', 'time_segment_permutation'],
                         help='List of transformation function names to use for SimCLR')
     
     args = parser.parse_args()
