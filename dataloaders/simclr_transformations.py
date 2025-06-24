@@ -158,21 +158,33 @@ def channel_shuffle_transform_vectorized(X: np.ndarray) -> np.ndarray:
     return X_shuffled
 
 # 7. Time Segment Permutation
-def time_segment_permutation_transform_improved(X: np.ndarray, num_segments: int = 4) -> np.ndarray:
+def time_segment_permutation_transform_improved(X: np.ndarray, nPerm=4, minSegLength=10, max_tries=100) -> np.ndarray:
     """
     Randomly scrambling sections of the signal
     """
-    segment_points_permuted = np.random.choice(X.shape[1], size=(X.shape[0], num_segments))
-    segment_points = np.sort(segment_points_permuted, axis=1)
+    B, T, C = X.shape
+    X_new = np.zeros_like(X)
 
-    X_transformed = np.empty(shape=X.shape)
-    for i, (sample, segments) in enumerate(zip(X, segment_points)):
-        # print(sample.shape)
-        splitted = np.array(np.split(sample, np.append(segments, X.shape[1])))
-        np.random.shuffle(splitted)
-        concat = np.concatenate(splitted, axis=0)
-        X_transformed[i] = concat
-    return X_transformed
+    for b in range(B):
+        for attempt in range(max_tries):
+            segs = np.zeros(nPerm + 1, dtype=int)
+            segs[1:-1] = np.sort(np.random.randint(minSegLength, T - minSegLength, nPerm - 1))
+            segs[-1] = T
+
+            # Check if all segments are at least minSegLength
+            if np.min(segs[1:] - segs[:-1]) > minSegLength:
+                break
+        else:
+            segs = np.linspace(0, T, nPerm + 1, dtype=int)
+
+        idx = np.random.permutation(nPerm)
+        pp = 0
+        for i in range(nPerm):
+            part = X[b, segs[idx[i]]:segs[idx[i] + 1], :]
+            X_new[b, pp:pp + len(part), :] = part
+            pp += len(part)
+
+    return X_new
 
 # 8. Time Warp (low cost)
 def time_warp_transform_low_cost(X: np.ndarray, sigma: float = 0.2, num_knots: int = 4, num_splines: int = 150) -> np.ndarray:
