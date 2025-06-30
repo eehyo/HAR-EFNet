@@ -30,12 +30,12 @@ class MTLSAHAREncoder(nn.Module):
         self.device = args.get('device', 'cpu')
         
         # List of supported tasks
-        self.task_list = ['jitter', 'scaling', 'time_warp', 'rotation', 'permutation',
-                         'negated', 'horizontal_flip', 'channel_shuffle']
+        self.task_list = ['noise', 'scaling', 'time_warp', 'rotation', 'time_segment_permutation',
+                         'negate', 'horizontal_flip', 'channel_shuffle']
         
         # Task-specific binary classification heads (MTL)
         self.task_heads = nn.ModuleDict({
-            'jitter': nn.Sequential(
+            'noise': nn.Sequential(
                 nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
                 nn.Dropout(0.1),
@@ -63,14 +63,14 @@ class MTLSAHAREncoder(nn.Module):
                 nn.Linear(256, 1),
                 nn.Sigmoid()
             ),
-            'permutation': nn.Sequential(
+            'time_segment_permutation': nn.Sequential(
                 nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
                 nn.Dropout(0.1),
                 nn.Linear(256, 1),
                 nn.Sigmoid()
             ),
-            'negated': nn.Sequential(
+            'negate': nn.Sequential(
                 nn.Linear(self.hidden_size, 256),
                 nn.ReLU(),
                 nn.Dropout(0.1),
