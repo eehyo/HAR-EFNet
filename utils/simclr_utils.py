@@ -1,12 +1,12 @@
 import numpy as np
 from typing import List, Callable, Tuple, Union, Any
-from dataloaders.simclr_transformations import (
-    noise_transform_vectorized,
-    scaling_transform_vectorized,
-    rotation_transform_vectorized,
-    negate_transform_vectorized,
-    time_flip_transform_vectorized,
-    channel_shuffle_transform_vectorized,
+from dataloaders.transformations import (
+    noise_transform,
+    scaling_transform,
+    rotation_transform,
+    negate_transform_probabilistic,
+    time_flip_transform_probabilistic,
+    channel_shuffle_transform,
     time_segment_permutation_transform_improved,
     time_warp_transform_low_cost
 )
@@ -85,12 +85,12 @@ def get_transform_function_by_name(transform_name: str) -> TransformFunction:
         ValueError: If transform name is not supported
     """
     transform_map: dict[str, TransformFunction] = {
-        'noise': noise_transform_vectorized,
-        'scaling': scaling_transform_vectorized,
-        'rotation': rotation_transform_vectorized,
-        'negate': negate_transform_vectorized,
-        'time_flip': time_flip_transform_vectorized,
-        'channel_shuffle': channel_shuffle_transform_vectorized,
+        'noise': noise_transform,
+        'scaling': scaling_transform,
+        'rotation': rotation_transform,
+        'negate': negate_transform_probabilistic,
+        'time_flip': time_flip_transform_probabilistic,
+        'channel_shuffle': channel_shuffle_transform,
         'time_segment_permutation': time_segment_permutation_transform_improved,
         'time_warp': time_warp_transform_low_cost
     }

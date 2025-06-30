@@ -8,9 +8,15 @@ from torch.utils.data import DataLoader, Dataset
 from typing import Tuple, Dict, List, Optional, Any, Union, Callable
 
 from encoders import MTLDeepConvLSTMEncoder, MTLDeepConvLSTMAttnEncoder, MTLSAHAREncoder
-from dataloaders.mtl_transformations import (
-    DA_Jitter, DA_Scaling, DA_TimeWarp, 
-    DA_Permutation, DA_Rotation_per_sensor, DA_Negated, DA_HorizontalFlip, DA_ChannelShuffle
+from dataloaders.transformations import (
+    noise_transform,
+    scaling_transform,
+    rotation_transform,
+    negate_transform,
+    channel_shuffle_transform,
+    time_segment_permutation_transform_improved,
+    time_warp_transform,
+    horizontal_flip_transform
 )
 from utils.training_utils import EarlyStopping, adjust_learning_rate, set_seed
 from utils.logger import Logger
@@ -401,21 +407,21 @@ def get_transform_functions() -> Dict[str, Callable]:
     
     def rotation_func(x):
         try:
-            return DA_Rotation_per_sensor(x)
+            return rotation_transform(x)
         except Exception as e:
             print(f"Error applying rotation transformation: {str(e)}, input shape: {x.shape}")
             raise
     
     # Construct transformation functions dictionary
     transform_funcs = {
-        'jitter': lambda x: DA_Jitter(x, sigma=0.05),
-        'scaling': lambda x: DA_Scaling(x, sigma=0.1),
-        'time_warp': lambda x: DA_TimeWarp(x, **time_warp_args),
+        'noise': lambda x: noise_transform(x, sigma=0.05),
+        'scaling': lambda x: scaling_transform(x, sigma=0.1),
+        'time_warp': lambda x: time_warp_transform(x, **time_warp_args),
         'rotation': rotation_func,
-        'permutation': lambda x: DA_Permutation(x, **permutation_args),
-        'negated': DA_Negated,
-        'horizontal_flip': DA_HorizontalFlip,
-        'channel_shuffle': DA_ChannelShuffle
+        'time_segment_permutation': lambda x: time_segment_permutation_transform_improved(x, **permutation_args),
+        'negate': negate_transform,
+        'horizontal_flip': horizontal_flip_transform,
+        'channel_shuffle': channel_shuffle_transform
     }
     
     return transform_funcs 

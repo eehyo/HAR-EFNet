@@ -72,7 +72,7 @@ class SimCLREncoderTrainer:
                                            logger_name=f"es_simclr_{args.encoder_type}")
         
         # Create transformation function from args
-        self.transform_funcs = getattr(args, 'transform_funcs', ['scaling_transform_vectorized', 'rotation_transform_vectorized'])
+        self.transform_funcs = getattr(args, 'transform_funcs', ['scaling_transform', 'rotation_transform'])
         self.transformation_function = create_simclr_transformation_function(self.transform_funcs)
         
         self.logger.info(f"Using transformation functions: {self.transform_funcs}")

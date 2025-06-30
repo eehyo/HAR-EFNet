@@ -42,12 +42,12 @@ def get_args():
     
     # MTL pretraining settings
     parser.add_argument('--mtl_mode', default=False, type=str2bool, help='Use MTL SSL pretraining')
-    parser.add_argument('--task_weights_jitter', type=float, default=1.0, help='Weight for jitter task')
+    parser.add_argument('--task_weights_noise', type=float, default=1.0, help='Weight for noise task')
     parser.add_argument('--task_weights_scaling', type=float, default=1.0, help='Weight for scaling task')
     parser.add_argument('--task_weights_time_warp', type=float, default=1.0, help='Weight for time warping task')
     parser.add_argument('--task_weights_rotation', type=float, default=1.0, help='Weight for rotation task')
-    parser.add_argument('--task_weights_permutation', type=float, default=1.0, help='Weight for permutation task')
-    parser.add_argument('--task_weights_negated', type=float, default=1.0, help='Weight for negation task')
+    parser.add_argument('--task_weights_time_segment_permutation', type=float, default=1.0, help='Weight for time segment permutation task')
+    parser.add_argument('--task_weights_negate', type=float, default=1.0, help='Weight for negation task')
     parser.add_argument('--task_weights_horizontal_flip', type=float, default=1.0, help='Weight for horizontal flip task')
     parser.add_argument('--task_weights_channel_shuffle', type=float, default=1.0, help='Weight for channel shuffle task')
 
@@ -68,12 +68,12 @@ def get_args():
     
     # MTL task weights
     args.task_weights = {
-        'jitter': args.task_weights_jitter,
+        'noise': args.task_weights_noise,
         'scaling': args.task_weights_scaling,
         'time_warp': args.task_weights_time_warp,
         'rotation': args.task_weights_rotation,
-        'permutation': args.task_weights_permutation,
-        'negated': args.task_weights_negated,
+        'time_segment_permutation': args.task_weights_time_segment_permutation,
+        'negate': args.task_weights_negate,
         'horizontal_flip': args.task_weights_horizontal_flip,
         'channel_shuffle': args.task_weights_channel_shuffle,
     }

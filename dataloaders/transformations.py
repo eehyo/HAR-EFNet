@@ -1,27 +1,29 @@
 import numpy as np
 import math
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import CubicSpline     # for warping
 import itertools
 from typing import List, Callable, Tuple, Union
 
-# 1. Noise
-def noise_transform_vectorized(X: np.ndarray, sigma: float = 0.05) -> np.ndarray:
+
+# 1. Noise - mtl, simclr
+# Random Gaussian noise added to each sample
+def noise_transform(X: np.ndarray, sigma: float = 0.05) -> np.ndarray:
     """
     Adding random Gaussian noise with mean 0
     """
     noise = np.random.normal(loc=0, scale=sigma, size=X.shape)
     return X + noise
 
-# 2. Scaling
-def scaling_transform_vectorized(X: np.ndarray, sigma: float = 0.1) -> np.ndarray:
+# 2. Scaling - mtl, simclr
+def scaling_transform(X: np.ndarray, sigma: float = 0.1) -> np.ndarray:
     """
     Scaling by a random factor
     """
     scaling_factor = np.random.normal(loc=1.0, scale=sigma, size=(X.shape[0], 1, X.shape[2]))
     return X * scaling_factor
 
-# 3. Rotation
-def rotation_transform_vectorized(X: np.ndarray) -> np.ndarray:
+# 3. Rotation - mtl, simclr
+def rotation_transform(X: np.ndarray) -> np.ndarray:
     """
     Applies a different random 3D rotation to each sensor triplet (x, y, z).
     For 9-channel input [x1, y1, z1, x2, y2, z2, x3, y3, z3], each (x, y, z) group gets its own rotation.
@@ -86,15 +88,15 @@ def axangle2mat(axis, angle, is_normalized = False) -> np.ndarray:
             [ xyC+zs,   y*yC+c,   yzC-xs ],
             [ zxC-ys,   yzC+xs,   z*zC+c ]])
 
-# # 4. Negation
-# def negate_transform_vectorized(X: np.ndarray) -> np.ndarray:
-#     """
-#     Inverting the signals
-#     """
-#     return X * -1
+# 4. Negation - mtl
+def negate_transform(X: np.ndarray) -> np.ndarray:
+    """
+    Inverting the signals
+    """
+    return X * -1
 
-# 4-1. Negation (probabilistic)
-def negate_transform_vectorized(X: np.ndarray, p: float = 0.5) -> np.ndarray:
+# 4-1. Negation (probabilistic) - simclr
+def negate_transform_probabilistic(X: np.ndarray, p: float = 0.5) -> np.ndarray:
     """
     With probability p, invert the signals; otherwise return X unchanged.
     """
@@ -102,15 +104,15 @@ def negate_transform_vectorized(X: np.ndarray, p: float = 0.5) -> np.ndarray:
         return -X
     return X
 
-# # 5. Time Flip
-# def time_flip_transform_vectorized(X: np.ndarray) -> np.ndarray:
+# # 5. Time Flip (not used)
+# def time_flip_transform(X: np.ndarray) -> np.ndarray:
 #     """
 #     Reversing the direction of time
 #     """
 #     return X[:, ::-1, :]
 
-# 5-1. Time Flip (probabilistic)
-def time_flip_transform_vectorized(X: np.ndarray, p: float = 0.5) -> np.ndarray:
+# 5-1. Time Flip (probabilistic) - simclr
+def time_flip_transform_probabilistic(X: np.ndarray, p: float = 0.5) -> np.ndarray:
     """
     With probability p, reverse the time dimension; otherwise return X unchanged.
     """
@@ -118,8 +120,9 @@ def time_flip_transform_vectorized(X: np.ndarray, p: float = 0.5) -> np.ndarray:
         return X[:, ::-1, :]
     return X
 
-# 6. Channel Shuffle
-def channel_shuffle_transform_vectorized(X: np.ndarray) -> np.ndarray:
+
+# 6. Channel Shuffle - mtl, simclr
+def channel_shuffle_transform(X: np.ndarray) -> np.ndarray:
     """
     Shuffling the axes (x, y, z) within each sensor group while preserving sensor structure.
     For 9-channel input [x1, y1, z1, x2, y2, z2, x3, y3, z3], 
@@ -157,7 +160,7 @@ def channel_shuffle_transform_vectorized(X: np.ndarray) -> np.ndarray:
     
     return X_shuffled
 
-# 7. Time Segment Permutation
+# 7. Time Segment Permutation - mtl, simclr
 def time_segment_permutation_transform_improved(X: np.ndarray, nPerm=4, minSegLength=10, max_tries=100) -> np.ndarray:
     """
     Randomly scrambling sections of the signal
@@ -166,7 +169,7 @@ def time_segment_permutation_transform_improved(X: np.ndarray, nPerm=4, minSegLe
     X_new = np.zeros_like(X)
 
     for b in range(B):
-        for attempt in range(max_tries):
+        for _ in range(max_tries):
             segs = np.zeros(nPerm + 1, dtype=int)
             segs[1:-1] = np.sort(np.random.randint(minSegLength, T - minSegLength, nPerm - 1))
             segs[-1] = T
@@ -186,7 +189,7 @@ def time_segment_permutation_transform_improved(X: np.ndarray, nPerm=4, minSegLe
 
     return X_new
 
-# 8. Time Warp (low cost)
+# 8. Time Warp (low cost) - simclr
 def time_warp_transform_low_cost(X: np.ndarray, sigma: float = 0.2, num_knots: int = 4, num_splines: int = 150) -> np.ndarray:
     """
     Stretching and warping the time-series (low cost)
@@ -214,7 +217,7 @@ def get_cubic_spline_interpolation(x_eval: np.ndarray, x_data: np.ndarray, y_dat
     cubic_spline = CubicSpline(x_data, y_data)
     return cubic_spline(x_eval)
 
-# 9. Time Warp (high cost) - not used
+# 9. Time Warp (high cost) - simclr(not used)
 def time_warp_transform_improved(X: np.ndarray, sigma: float = 0.2, num_knots: int = 4) -> np.ndarray:
     """
     Stretching and warping the time-series
@@ -232,3 +235,66 @@ def time_warp_transform_improved(X: np.ndarray, sigma: float = 0.2, num_knots: i
     for i, distorted_time_stamps in enumerate(distorted_time_stamps_all):
         X_transformed[i // X.shape[2], :, i % X.shape[2]] = np.interp(time_stamps, distorted_time_stamps, X[i // X.shape[2], :, i % X.shape[2]])
     return X_transformed
+
+# 10. Time Warping - mtl
+# Warps time steps using smoothly varying curves
+def time_warp_transform(X, sigma=0.2, knot=4):
+    B, T, C = X.shape
+    X_new = np.zeros_like(X)
+    x_range = np.arange(T)
+
+    for b in range(B):
+        tt_new = DistortTimesteps(X[b], sigma=sigma, knot=knot)
+        for i in range(C):
+            X_new[b, :, i] = np.interp(x_range, tt_new[:, i], X[b, :, i])
+
+    return X_new
+
+def GenerateRandomCurves(X, sigma=0.2, knot=4):
+    xx = np.linspace(0, X.shape[0] - 1, num=knot + 2) 
+    yy = np.random.normal(loc=1.0, scale=sigma, size=(knot + 2, X.shape[1])) 
+    x_range = np.arange(X.shape[0])
+    warped = np.zeros_like(X)
+    for i in range(X.shape[1]):
+        cs = CubicSpline(xx, yy[:, i])
+        warped[:, i] = cs(x_range)
+    return warped
+
+def DistortTimesteps(X, sigma=0.2, knot=4):
+    tt = GenerateRandomCurves(X, sigma=sigma, knot=knot)
+    tt_cum = np.cumsum(tt, axis=0)  # Add intervals to make a cumulative graph
+    t_scale = [(X.shape[0] - 1) / tt_cum[-1, i] for i in range(X.shape[1])]
+    for i in range(X.shape[1]):
+        tt_cum[:, i] *= t_scale[i]
+    return tt_cum
+
+
+# 11. Horizontally Flipped - mtl
+def horizontal_flip_transform(X: np.ndarray) -> np.ndarray: 
+    """
+    Flips the signal in time (reverses along time axis).
+    Input:
+        X: [T, C]
+    Output:
+        X_flipped: [T, C]
+    """
+    return np.flip(X, axis=0)
+
+
+# Common transform functions
+# noise_transform
+# scaling_transform
+# rotation_transform
+# channel_shuffle_transform
+# time_segment_permutation_transform_improved
+
+# MTL-specific transform functions
+# negate_transform
+# time_warp_transform
+# horizontal_flip_transform
+
+# SimCLR-specific transform functions
+# negate_transform_probabilistic
+# time_flip_transform_probabilistic
+# time_warp_transform_low_cost
+# time_warp_transform_improved (not used)
