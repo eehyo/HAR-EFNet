@@ -233,6 +233,16 @@ def create_classifier(args: Any, encoder: nn.Module) -> nn.Module:
     # Initialize logger
     logger = Logger("classifier_creator")
     
+    # Extract base encoder if it's wrapped for SSL training
+    if hasattr(encoder, 'base_encoder'):
+        # For masked reconstruction, extract the base encoder
+        base_encoder = encoder.base_encoder
+        logger.info("Extracted base encoder from masked reconstruction wrapper")
+    else:
+        # For regular encoder or other types
+        base_encoder = encoder
+        logger.info("Using encoder directly")
+    
     # Load model configuration - use relative path for flexibility
     config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'configs', 'model.yaml')
     with open(config_path, mode='r') as config_file:
@@ -269,7 +279,7 @@ def create_classifier(args: Any, encoder: nn.Module) -> nn.Module:
             raise ValueError(f"Unsupported encoder type: {args.encoder_type}")
     # Create selected classifier model
     model = model_class(
-        encoder=encoder,
+        encoder=base_encoder,
         num_classes=args.num_classes,
         config=classifier_args
     )
