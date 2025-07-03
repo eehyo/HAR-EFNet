@@ -57,6 +57,18 @@ class MaskedSAHAREncoder(nn.Module):
         """
         return self.base_encoder.get_embedding_dim()
     
+    def extract_features(self, x):
+        """
+        Extract features for classification or other downstream tasks
+        
+        Args:
+            x: Input tensor [batch_size, window_size, input_channels]
+            
+        Returns:
+            Feature embedding [batch_size, embedding_dim]
+        """
+        return self.base_encoder.extract_features(x)
+    
     def get_loss(self, input_target, validation=False):
         """
         Calculate masked reconstruction loss
@@ -69,10 +81,6 @@ class MaskedSAHAREncoder(nn.Module):
             MSE loss between masked reconstruction and target
         """
         return self.masked_model.get_loss(input_target, validation)
-    
-    def prepare_for_epoch(self, current_epoch, max_epochs):
-        """Compatibility method for training framework"""
-        pass
     
     def freeze_all(self):
         """Freeze all parameters"""

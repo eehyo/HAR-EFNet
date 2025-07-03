@@ -74,10 +74,6 @@ class MaskedReconstruction(nn.Module):
         self.decoder = Decoder(repr_size=repr_size, in_size=in_size, window_size=window_size)
         self.criterion = nn.MSELoss()
 
-    def prepare_for_epoch(self, current_epoch, max_epochs):
-        """Compatibility method for training framework"""
-        pass
-
     def forward(self, x):
         """
         Forward pass through encoder and decoder

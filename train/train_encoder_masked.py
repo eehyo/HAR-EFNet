@@ -40,22 +40,11 @@ class MaskedReconstructionTrainer:
         # Configure optimizer with weight decay
         if args.optimizer == "Adam":
             self.optimizer = optim.Adam(self.model.parameters(), 
-                                      lr=args.learning_rate, 
-                                      weight_decay=args.weight_decay)
+                                      lr=args.learning_rate)
         else:
             self.optimizer = optim.SGD(self.model.parameters(), 
-                                     lr=args.learning_rate, 
-                                     weight_decay=args.weight_decay,
-                                     momentum=0.9)
+                                     lr=args.learning_rate)
         
-        # Learning rate scheduler (basic step scheduler as requested)
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, 
-            mode='min',
-            factor=args.learning_rate_factor,
-            patience=args.learning_rate_patience,
-            verbose=True
-        )
         
         # Save path and logging setup
         self.save_path = save_path
@@ -169,58 +158,27 @@ class MaskedReconstructionTrainer:
         masked_train_loader = create_masked_dataloader(train_loader, mask_choice=self.mask_choice)
         masked_valid_loader = create_masked_dataloader(valid_loader, mask_choice=self.mask_choice)
         
-        # Get run_id from Logger for consistent naming
-        run_id = Logger.get_run_id()
-        
-        # Training loop
         for epoch in range(self.epochs):
-            epoch_start_time = time.time()
-            
-            # Train one epoch
+            # Training phase
             train_loss, train_time = self.train_epoch(masked_train_loader)
             
-            # Validate
+            # Log training progress
+            log_message = f"Epoch: {epoch+1}, train_loss: {train_loss:.7f}, time: {train_time:.2f}s"
+            self.logger.info(log_message)
+            
+            # Validation phase
             valid_loss = self.validate(masked_valid_loader)
             
-            # Update learning rate scheduler
-            self.scheduler.step(valid_loss)
-            
-            epoch_time = time.time() - epoch_start_time
-            
-            # Log epoch results
-            self.logger.info(
-                f"Epoch {epoch+1}/{self.epochs} | "
-                f"Train Loss: {train_loss:.6f} | "
-                f"Valid Loss: {valid_loss:.6f} | "
-                f"LR: {self.optimizer.param_groups[0]['lr']:.2e} | "
-                f"Time: {epoch_time:.2f}s"
-            )
+            # Log validation results
+            log_message = f"Validation: Epoch: {epoch+1}, Train Loss: {train_loss:.7f}, Valid Loss: {valid_loss:.7f}"
+            self.logger.info(log_message)
             
             # Early stopping check
-            self.early_stopping(valid_loss, self.model)
+            self.early_stopping(valid_loss, self.model, self.save_path, None)
             
             if self.early_stopping.early_stop:
                 self.logger.info("Early stopping triggered")
                 break
-            
-            # Save best model
-            if self.early_stopping.save_checkpoint:
-                model_path = os.path.join(self.save_path, f"best_model_{run_id}.pth")
-                torch.save({
-                    'epoch': epoch + 1,
-                    'model_state_dict': self.model.state_dict(),
-                    'optimizer_state_dict': self.optimizer.state_dict(),
-                    'train_loss': train_loss,
-                    'valid_loss': valid_loss,
-                }, model_path)
-                self.logger.info(f"Model saved to {model_path}")
-        
-        # Load best model
-        best_model_path = os.path.join(self.save_path, f"best_model_{run_id}.pth")
-        if os.path.exists(best_model_path):
-            checkpoint = torch.load(best_model_path, map_location=self.device, weights_only=False)
-            self.model.load_state_dict(checkpoint['model_state_dict'])
-            self.logger.info(f"Loaded best model from {best_model_path}")
         
         self.logger.info("Masked reconstruction training completed")
         return self.model
@@ -284,32 +242,30 @@ def load_pretrained_masked_encoder(encoder: nn.Module, path: str) -> nn.Module:
     Load pretrained masked reconstruction encoder
     
     Args:
-        encoder: Encoder model to load weights into
-        path: Path to saved model checkpoint
+        encoder: Masked reconstruction encoder model instance
+        path: Path to checkpoint file
         
     Returns:
         Encoder with loaded weights
+        
+    Raises:
+        FileNotFoundError: If the checkpoint file doesn't exist
+        RuntimeError: If there's an error loading the state dict
     """
-    logger = Logger.get_logger("masked_encoder_loader")
+    logger = Logger("masked_encoder_loader")
+    logger.info(f"Loading pretrained masked reconstruction encoder from: {path}")
     
     if not os.path.exists(path):
         logger.error(f"Checkpoint file not found: {path}")
         raise FileNotFoundError(f"Checkpoint file not found: {path}")
     
     try:
-        checkpoint = torch.load(path, map_location='cpu', weights_only=False)
-        
-        if 'model_state_dict' in checkpoint:
-            encoder.load_state_dict(checkpoint['model_state_dict'])
-            logger.info(f"Loaded model state dict from epoch {checkpoint.get('epoch', 'unknown')}")
-        else:
-            encoder.load_state_dict(checkpoint)
-            logger.info("Loaded model state dict (legacy format)")
-            
-        logger.info(f"Successfully loaded masked reconstruction encoder from {path}")
-        
+        checkpoint = torch.load(path, map_location=encoder.device, weights_only=False)
+        encoder.load_state_dict(checkpoint['model_state_dict'])
+        val_loss = checkpoint.get('val_loss', 'N/A')
+        logger.info(f"Successfully loaded model with validation loss: {val_loss}")
     except Exception as e:
-        logger.error(f"Error loading checkpoint: {e}")
-        raise e
+        logger.error(f"Error loading checkpoint: {str(e)}")
+        raise RuntimeError(f"Failed to load checkpoint: {str(e)}")
     
     return encoder 
