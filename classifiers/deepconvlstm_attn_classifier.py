@@ -33,7 +33,7 @@ class DeepConvLSTMAttnClassifier(nn.Module):
         if self.layer_type == 'single':
             # Single-layer classification model  
             # apply dropout
-            features = self.dropout(features) # (batch_size, embedding_dim)
+            # features = self.dropout(features) # (batch_size, embedding_dim)
             
             # linear classifier for class prediction
             output = self.fc(features) # (batch_size, num_classes)

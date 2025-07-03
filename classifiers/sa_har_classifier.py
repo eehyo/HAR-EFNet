@@ -29,7 +29,7 @@ class SAHARClassifier(nn.Module):
         if self.layer_type == 'single':
             # Single-layer classification model  
             # apply dropout
-            features = self.dropout(features)
+            # features = self.dropout(features)
             
             # single FC layer for classification
             output = self.fc(features)
