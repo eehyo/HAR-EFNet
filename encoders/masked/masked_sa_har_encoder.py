@@ -17,6 +17,7 @@ class MaskedSAHAREncoder(nn.Module):
         # Store configuration
         self.window_size = config.get('window_size', 168)
         self.input_channels = config.get('input_channels', 9)
+        self.device = config.get('device', 'cpu')
         
         # Create masked reconstruction model
         self.masked_model = MaskedReconstruction(

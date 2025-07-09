@@ -187,6 +187,7 @@ if __name__ == '__main__':
     
     # Summarize all fold results if testing was performed
     if args.test and len(results['subject_id']) > 0:
+        args.encoder_type = f"masked_{args.encoder_type}"
         save_results_summary(results, args, timestamp)
     
     logger.info("All masked reconstruction processes completed successfully.") 
