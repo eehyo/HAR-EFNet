@@ -293,7 +293,7 @@ class EncoderTrainerColloSSL:
         
         # Convert to ColloSSL data loaders using config batch size
         device_channel_mapping = self.args.device_channel_mapping
-        neg_sample_size = getattr(self.args, 'neg_sample_size', 1)  # 추가된 파라미터
+        neg_sample_size = getattr(self.args, 'neg_sample_size', 1)
         
         collossl_train_loader = create_collossl_dataloader(
             train_loader, device_channel_mapping, 

@@ -81,11 +81,7 @@ def get_args():
                                'closest_pos_rest_neg', 'closest_two', 'closest_two_reverse', 
                                'random_selection', 'mid_selection', 'closest_pos_random_neg'],
                        help='Device selection strategy for positive/negative device selection')
-        
-    # ColloSSL multi-device settings (auto-load from data.yaml)
-    args.device_channel_mapping = data_config.get('device_channel_mapping', {})
-    args.available_devices = data_config.get('devices', [])
-    args.channels_per_device = data_config.get('channels_per_device', 3)
+
 
     args = parser.parse_args()
     
@@ -163,6 +159,16 @@ def get_args():
     # ECDF feature dimension
     args.n_ecdf_points = 25
     args.output_size = (3, 78) 
+
+    # ColloSSL multi-device settings (auto-load from data.yaml)
+    args.device_channel_mapping = data_config.get('device_channel_mapping', {})
+    args.available_devices = data_config.get('devices', [])
+    args.channels_per_device = data_config.get('channels_per_device', 3)
+    
+    # ColloSSL multi-device settings (auto-load from data.yaml)
+    args.device_channel_mapping = data_config.get('device_channel_mapping', {})
+    args.available_devices = data_config.get('devices', [])
+    args.channels_per_device = data_config.get('channels_per_device', 3)
     
     # Random seed and other settings
     args.sensor_select = ["acc"]

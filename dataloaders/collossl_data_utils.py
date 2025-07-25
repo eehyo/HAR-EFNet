@@ -15,7 +15,7 @@ class ColloSSLDataset(Dataset):
     3. Batch-level asynchronous sampling for negatives
     """
     def __init__(self, original_dataset, device_channel_mapping: Dict[str, List[int]], 
-                 anchor_device: str = 'wrist', batch_size: int = 256):
+                 anchor_device: str = 'wrist', batch_size: int = 256, neg_sample_size: int = 1):
         """
         Initialize ColloSSL dataset
         
@@ -24,11 +24,13 @@ class ColloSSLDataset(Dataset):
             device_channel_mapping: Mapping from device names to channel indices
             anchor_device: Primary device for anchor samples
             batch_size: Batch size for asynchronous negative sampling
+            neg_sample_size: Number of negative samples per device
         """
         self.original_dataset = original_dataset
         self.device_channel_mapping = device_channel_mapping
         self.anchor_device = anchor_device
         self.batch_size = batch_size
+        self.neg_sample_size = neg_sample_size
         
         # Available devices (all devices are potential positives/negatives)
         self.devices = list(device_channel_mapping.keys())
@@ -102,29 +104,37 @@ class ColloSSLDataset(Dataset):
             
         Returns:
             Dict of asynchronous device data for all candidate devices
+            Each device returns [neg_sample_size, window_size, 3]
         """
         # Get the batch containing anchor
         anchor_batch = self.get_batch_for_index(anchor_idx)
         
         async_samples = {}
         for device in self.candidate_devices:
-            # Sample different time step t' ≠ t from the same batch
-            available_indices = [idx for idx in anchor_batch if idx != anchor_idx]
+            # Collect multiple negative samples for this device
+            device_samples = []
             
-            if available_indices:
-                async_idx = random.choice(available_indices)
-            else:
-                # Fallback: sample from a different batch
-                other_batches = [b for b in self.time_aligned_batches if anchor_idx not in b]
-                if other_batches:
-                    other_batch = random.choice(other_batches)
-                    async_idx = random.choice(other_batch)
+            for _ in range(self.neg_sample_size):
+                # Sample different time step t' ≠ t from the same batch
+                available_indices = [idx for idx in anchor_batch if idx != anchor_idx]
+                
+                if available_indices:
+                    async_idx = random.choice(available_indices)
                 else:
-                    async_idx = anchor_idx  # Last resort
+                    # Fallback: sample from a different batch
+                    other_batches = [b for b in self.time_aligned_batches if anchor_idx not in b]
+                    if other_batches:
+                        other_batch = random.choice(other_batches)
+                        async_idx = random.choice(other_batch)
+                    else:
+                        async_idx = anchor_idx  # Last resort
+                
+                x, _ = self.original_dataset[async_idx]
+                device_data = self.extract_device_data(x, device)
+                device_samples.append(device_data)
             
-            x, _ = self.original_dataset[async_idx]
-            device_data = self.extract_device_data(x, device)
-            async_samples[device] = device_data
+            # Stack samples: [neg_sample_size, window_size, 3]
+            async_samples[device] = np.stack(device_samples, axis=0)
         
         return async_samples
     
@@ -167,7 +177,7 @@ from utils.collossl_utils import compute_mmd_distance, select_positive_device_mm
 
 
 def create_collossl_dataloader(base_dataloader: DataLoader, device_channel_mapping: Dict[str, List[int]], 
-                              anchor_device: str = 'wrist', batch_size: int = 256) -> DataLoader:
+                              anchor_device: str = 'wrist', batch_size: int = 256, neg_sample_size: int = 1) -> DataLoader:
     """
     Create ColloSSL dataloader from base PAMAP2 dataloader
     
@@ -176,6 +186,7 @@ def create_collossl_dataloader(base_dataloader: DataLoader, device_channel_mappi
         device_channel_mapping: Mapping from device names to channel indices
         anchor_device: Anchor device name
         batch_size: Batch size (default from config)
+        neg_sample_size: Number of negative samples per device
         
     Returns:
         ColloSSL dataloader
@@ -187,7 +198,8 @@ def create_collossl_dataloader(base_dataloader: DataLoader, device_channel_mappi
         original_dataset=base_dataset,
         device_channel_mapping=device_channel_mapping,
         anchor_device=anchor_device,
-        batch_size=batch_size
+        batch_size=batch_size,
+        neg_sample_size=neg_sample_size
     )
     
     # Create new dataloader with same settings
@@ -231,9 +243,11 @@ def collossl_collate_fn(batch):
         
         for sample in batch:
             sync_data_list.append(torch.tensor(sample['sync_samples'][device]))
+            # async_samples[device] is now [neg_sample_size, window_size, 3]
             async_data_list.append(torch.tensor(sample['async_samples'][device]))
         
         sync_samples[device] = torch.stack(sync_data_list)
+        # async_samples[device] will be [batch_size, neg_sample_size, window_size, 3]
         async_samples[device] = torch.stack(async_data_list)
     
     return {
