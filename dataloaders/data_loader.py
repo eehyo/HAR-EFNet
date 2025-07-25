@@ -9,8 +9,8 @@ from sklearn.model_selection import train_test_split
 
 from .data_utils import Normalizer,components_selection_one_signal
 
-def get_data(dataset, batch_size, flag="train"):
-    if flag == 'train':
+def get_data(dataset, batch_size, flag="train", collossl_mode=False):
+    if flag == 'train' and not collossl_mode:
         shuffle_flag = True
     else:
         shuffle_flag = False
