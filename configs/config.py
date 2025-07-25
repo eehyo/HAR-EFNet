@@ -63,7 +63,30 @@ def get_args():
     parser.add_argument('--transform_funcs', nargs='+', 
                         default=['channel_shuffle', 'time_segment_permutation'],
                         help='List of transformation function names to use for SimCLR')
-    
+
+    # ColloSSL pretraining settings
+    parser.add_argument('--collossl_mode', default=False, type=str2bool, help='Use ColloSSL contrastive learning')
+    parser.add_argument('--anchor_device', default='wrist', type=str, choices=['wrist', 'chest', 'ankle'], 
+                        help='Anchor device for ColloSSL (wrist/chest/ankle)')
+    parser.add_argument('--mmd_kernel', default='rbf', type=str, choices=['linear', 'rbf'], 
+                        help='Kernel type for MMD calculation')
+    parser.add_argument('--mmd_sigma', type=float, default=1.0, help='Bandwidth parameter for RBF kernel in MMD')
+    parser.add_argument('--collossl_temperature', type=float, default=0.1, help='Temperature parameter for ColloSSL contrastive loss')
+    parser.add_argument('--neg_sample_size', type=int, default=1, help='Number of negative samples per device')
+    parser.add_argument('--device_selection_metric', type=str, default='mmd_acc_norm', 
+                       choices=['mmd_acc_norm', 'mmd_acc_per_channel', 'mmd_full_feature'],
+                       help='Device selection metric for MMD computation')
+    parser.add_argument('--device_selection_strategy', type=str, default='hard_negative',
+                       choices=['closest_only', 'hard_negative', 'closest_pos_all_neg', 'harder_negative',
+                               'closest_pos_rest_neg', 'closest_two', 'closest_two_reverse', 
+                               'random_selection', 'mid_selection', 'closest_pos_random_neg'],
+                       help='Device selection strategy for positive/negative device selection')
+        
+    # ColloSSL multi-device settings (auto-load from data.yaml)
+    args.device_channel_mapping = data_config.get('device_channel_mapping', {})
+    args.available_devices = data_config.get('devices', [])
+    args.channels_per_device = data_config.get('channels_per_device', 3)
+
     args = parser.parse_args()
     
     # MTL task weights
@@ -118,6 +141,7 @@ def get_args():
     args.learning_rate_factor = 0.1
     args.early_stop_patience = 20
     args.batch_size = 256
+    # args.batch_size = 512  # ColloSSL
     args.shuffle = True
     args.drop_last = False
     args.train_vali_quote = 0.90
@@ -125,6 +149,7 @@ def get_args():
     args.classifier_lr = 0.0001
     args.classifier_epochs = 300
     args.classifier_batch_size = 256
+    # args.classifier_batch_size = 512  # ColloSSL
     args.freeze_encoder = True  # Freeze
     
     # Time series input settings

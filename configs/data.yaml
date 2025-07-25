@@ -8,3 +8,11 @@ pamap2:
   num_channels: 9  
   # num_channels: 18  
   window_seconds: 5.12  # window_size: 5.12 * 33 = 168
+  
+  # ColloSSL multi-device settings
+  devices: ['wrist', 'chest', 'ankle']  # Available IMU sensor locations
+  channels_per_device: 3  # x, y, z accelerometer channels per device
+  device_channel_mapping:
+    wrist: [0, 1, 2]    # hand accelerometer channels
+    chest: [3, 4, 5]    # chest accelerometer channels  
+    ankle: [6, 7, 8]    # ankle accelerometer channels

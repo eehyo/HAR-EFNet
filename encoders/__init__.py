@@ -2,6 +2,7 @@ from .base import DeepConvLSTMEncoder, DeepConvLSTMAttnEncoder, SAHAREncoder
 from .mtl import MTLDeepConvLSTMEncoder, MTLDeepConvLSTMAttnEncoder, MTLSAHAREncoder
 from .simclr import SimCLRDeepConvLSTMEncoder, SimCLRDeepConvLSTMAttnEncoder, SimCLRSAHAREncoder
 from .masked import MaskedDeepConvLSTMEncoder, MaskedDeepConvLSTMAttnEncoder, MaskedSAHAREncoder
+from .collossl import ColloSSLEncoder
 
 __all__ = [
     'DeepConvLSTMEncoder',
@@ -15,5 +16,6 @@ __all__ = [
     'SimCLRSAHAREncoder',
     'MaskedDeepConvLSTMEncoder',
     'MaskedDeepConvLSTMAttnEncoder',
-    'MaskedSAHAREncoder'
+    'MaskedSAHAREncoder',
+    'ColloSSLEncoder'
 ] 
