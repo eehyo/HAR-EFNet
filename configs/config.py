@@ -171,7 +171,8 @@ def get_args():
     args.channels_per_device = data_config.get('channels_per_device', 3)
     
     # Random seed and other settings
-    args.sensor_select = ["acc"]
+    args.sensor_select      = ["acc"] # ["acc", "gyro"]
+    args.pos_select        = None # ["hand", "chest", "ankle"]
     args.seed = 10
     args.filtering = True
     args.freq1 = 0.001
