@@ -68,9 +68,6 @@ def get_args():
     parser.add_argument('--collossl_mode', default=False, type=str2bool, help='Use ColloSSL contrastive learning')
     parser.add_argument('--anchor_device', default='wrist', type=str, choices=['wrist', 'chest', 'ankle'], 
                         help='Anchor device for ColloSSL (wrist/chest/ankle)')
-    parser.add_argument('--mmd_kernel', default='rbf', type=str, choices=['linear', 'rbf'], 
-                        help='Kernel type for MMD calculation')
-    parser.add_argument('--mmd_sigma', type=float, default=1.0, help='Bandwidth parameter for RBF kernel in MMD')
     parser.add_argument('--collossl_temperature', type=float, default=0.1, help='Temperature parameter for ColloSSL contrastive loss')
     parser.add_argument('--neg_sample_size', type=int, default=1, help='Number of negative samples per device')
     parser.add_argument('--device_selection_metric', type=str, default='mmd_acc_norm', 
@@ -124,7 +121,6 @@ def get_args():
         print('Device: CPU')
     
     args.optimizer = "Adam"
-    args.criterion = "MSELoss" if args.train_encoder else "CrossEntropy"
     args.exp_mode = "LOCV"
     args.datanorm_type = "standardization"
     

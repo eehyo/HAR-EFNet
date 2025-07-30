@@ -40,11 +40,9 @@ class EncoderTrainerColloSSL:
         self.logger = Logger(f"collossl_encoder_{args.encoder_type}")
         self.logger.info(f"Using device: {self.device}")
         
-        # ColloSSL contrastive loss (updated parameters)
+        # ColloSSL contrastive loss
         self.criterion = ColloSSLLoss(
             temperature=args.collossl_temperature,
-            mmd_kernel=args.mmd_kernel,
-            mmd_sigma=args.mmd_sigma,
             neg_sample_size=getattr(args, 'neg_sample_size', 1),
             device_selection_metric=getattr(args, 'device_selection_metric', 'mmd_acc_norm'),
             device_selection_strategy=getattr(args, 'device_selection_strategy', 'hard_negative')
